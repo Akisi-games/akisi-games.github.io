@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ARBS Prefab Analyzer — AKISI Tools</title>
+<meta name="robots" content="noindex,nofollow" />
+<style>
+:root {
+  --bg: #06060c;
+  --bg-soft: #0d0d18;
+  --bg-card: #11111e;
+  --border: #1f1f33;
+  --border-soft: #181828;
+  --text: #e6e7f0;
+  --text-soft: #8a8ca0;
+  --text-muted: #555770;
+  --cyan: #00f0ff;
+  --cyan-soft: #00f0ff33;
+  --red: #ff3050;
+  --yellow: #fff200;
+  --green: #3fd97a;
+  --pink: #ff60b0;
+  --orange: #ff9133;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif; }
+a { color: var(--cyan); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 32px; border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 12px; font-weight: 900; letter-spacing: 4px; }
+.brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
+.brand-text { color: var(--text); }
+.nav .crumb { color: var(--text-soft); font-size: 13px; letter-spacing: 2px; }
+
+.wrap { max-width: 1280px; margin: 0 auto; padding: 48px 32px; }
+h1 { margin: 0 0 8px 0; font-size: 40px; letter-spacing: 2px; }
+.subtitle { color: var(--text-soft); margin: 0 0 32px; font-size: 15px; }
+.subtitle code { background: var(--bg-soft); padding: 2px 8px; border-radius: 4px; font-size: 13px; color: var(--cyan); }
+
+.drop {
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .15s ease;
+  background: linear-gradient(180deg, transparent, var(--bg-soft) 100%);
+}
+.drop:hover, .drop.dragover {
+  border-color: var(--cyan);
+  background: var(--cyan-soft);
+}
+.drop .big { font-size: 24px; font-weight: 900; margin-bottom: 8px; }
+.drop .small { color: var(--text-soft); font-size: 13px; }
+.drop input { display: none; }
+
+.toolbar {
+  display: flex; gap: 16px; margin: 32px 0 16px; flex-wrap: wrap; align-items: center;
+}
+.toolbar button, .toolbar select {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.toolbar button:hover { border-color: var(--cyan); color: var(--cyan); }
+.toolbar .count { color: var(--text-soft); font-size: 13px; margin-left: auto; }
+
+.results { display: grid; gap: 16px; }
+.result {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.result.error { border-color: var(--red); }
+.result-head {
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
+  gap: 16px;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+.result-head:hover { background: var(--bg-soft); }
+.result-head .name { font-weight: 900; font-size: 18px; word-break: break-all; }
+.result-head .label { font-size: 11px; color: var(--text-muted); letter-spacing: 1.5px; }
+.result-head .val { font-size: 14px; color: var(--text); }
+.result-head .val.hp { color: var(--green); }
+.result-head .val.dmg { color: var(--red); }
+.result-head .val.scale { color: var(--yellow); }
+.result-head .val.weapons { color: var(--cyan); font-weight: 900; }
+.result-head .toggle { color: var(--text-soft); font-size: 18px; transition: transform .2s; }
+.result.open .toggle { transform: rotate(90deg); color: var(--cyan); }
+
+.result-body { display: none; padding: 0 24px 24px; border-top: 1px solid var(--border-soft); }
+.result.open .result-body { display: block; }
+
+.meta-row { display: flex; gap: 24px; margin: 16px 0; flex-wrap: wrap; color: var(--text-soft); font-size: 12px; }
+.meta-row span b { color: var(--text); margin-right: 6px; }
+
+table.weapons { width: 100%; border-collapse: collapse; margin-top: 12px; }
+table.weapons th, table.weapons td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+table.weapons th { color: var(--text-muted); font-weight: 500; letter-spacing: 1px; font-size: 11px; text-transform: uppercase; }
+table.weapons tr:hover { background: var(--bg-soft); }
+table.weapons .cat { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; letter-spacing: 1px; }
+table.weapons .cat.UnitCreator { background: #00f0ff22; color: var(--cyan); }
+table.weapons .cat.Animals { background: #fff20022; color: var(--yellow); }
+table.weapons .cat.Weapons { background: #ff305022; color: var(--red); }
+table.weapons .cat.Buildings { background: #3fd97a22; color: var(--green); }
+table.weapons .cat.Landscape { background: #ff913322; color: var(--orange); }
+table.weapons .cat.Unknown { background: #88888822; color: var(--text-soft); }
+table.weapons .num { text-align: right; font-variant-numeric: tabular-nums; }
+table.weapons .count { font-weight: 900; color: var(--cyan); }
+
+.error-msg { padding: 24px; color: var(--red); font-size: 14px; }
+
+.empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 60px 0;
+}
+
+footer { padding: 32px; text-align: center; color: var(--text-muted); font-size: 12px; border-top: 1px solid var(--border); margin-top: 64px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="brand">
+    <span class="dot"></span>
+    <span class="brand-text">AKISI</span>
+    <span class="crumb">/ TOOLS / PREFAB ANALYZER</span>
+  </div>
+  <a href="/">← Back to AKISI</a>
+</nav>
+
+<div class="wrap">
+  <h1>Prefab Analyzer</h1>
+  <p class="subtitle">
+    Animal Revolt Battle Simulator の <code>WEP_ANIM_PREF_*</code> ファイルを解析し、
+    ベースユニット・HP/攻撃倍率・スケール・装着武器の集計を一覧表示します。
+    <br>すべての処理はブラウザ内で完結します（ファイルはサーバーに送信されません）。
+  </p>
+
+  <label class="drop" id="drop">
+    <input type="file" id="file" multiple />
+    <div class="big">プレハブファイルをドラッグ&ドロップ</div>
+    <div class="small">複数選択可 / <code>WEP_ANIM_PREF_</code> から始まるバイナリファイル（拡張子なし）</div>
+  </label>
+
+  <div class="toolbar" id="toolbar" style="display:none">
+    <button id="expandAll">すべて展開</button>
+    <button id="collapseAll">すべて折りたたみ</button>
+    <select id="sort">
+      <option value="name">並び順：プレハブ名</option>
+      <option value="weapons">並び順：武器数（多い順）</option>
+      <option value="hp">並び順：HP倍率（高い順）</option>
+      <option value="dmg">並び順：攻撃倍率（高い順）</option>
+    </select>
+    <button id="clear">クリア</button>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="results" id="results"></div>
+  <div class="empty" id="empty">ファイルをアップロードすると結果がここに表示されます</div>
+</div>
+
+<footer>
+  <div>AKISI Tools / Prefab Analyzer</div>
+  <div>Prefab map: 1375 entries extracted from Assembly-CSharp.dll</div>
+</footer>
+
+<script>
+/* ============================================================
+   NRBF Parser (subset, sufficient for WeaponisedAnimalPrefab)
+   ============================================================ */
+class NRBFReader {
+  constructor(buf) {
+    this.view = new DataView(buf);
+    this.pos = 0;
+    this.objects = new Map();
+    this.classMeta = new Map();
+    this.libraries = new Map();
+    this.rootId = 0;
+  }
+  u8(){ return this.view.getUint8(this.pos++); }
+  i16(){ const v=this.view.getInt16(this.pos,true); this.pos+=2; return v; }
+  i32(){ const v=this.view.getInt32(this.pos,true); this.pos+=4; return v; }
+  u32(){ const v=this.view.getUint32(this.pos,true); this.pos+=4; return v; }
+  f32(){ const v=this.view.getFloat32(this.pos,true); this.pos+=4; return v; }
+  f64(){ const v=this.view.getFloat64(this.pos,true); this.pos+=8; return v; }
+  i64(){
+    const lo=this.u32(), hi=this.i32();
+    return BigInt(hi)*(1n<<32n)+BigInt(lo);
+  }
+  str(){
+    let len=0,shift=0;
+    while(true){
+      const b=this.u8();
+      len |= (b & 0x7f) << shift;
+      if(!(b & 0x80)) break;
+      shift += 7;
+      if(shift > 35) throw new Error('LPS too big');
+    }
+    const bytes = new Uint8Array(this.view.buffer, this.view.byteOffset + this.pos, len);
+    this.pos += len;
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+  readHeader(){
+    const rt = this.u8();
+    if(rt !== 0) throw new Error('Not NRBF (record type '+rt+')');
+    this.rootId = this.i32();
+    this.i32();
+    const major = this.i32(), minor = this.i32();
+    if(major !== 1) console.warn('NRBF version', major, minor);
+  }
+  readPrimitive(t){
+    switch(t){
+      case 1: return this.u8() !== 0;
+      case 2: return this.u8();
+      case 6: return this.f64();
+      case 7: return this.i16();
+      case 8: return this.i32();
+      case 9: return this.i64();
+      case 11: return this.f32();
+      case 18: return this.str();
+      default: throw new Error('Unsupported primitive type '+t);
+    }
+  }
+  readAddInfo(bt){
+    switch(bt){
+      case 0: return this.u8();
+      case 1: return null;
+      case 2: return null;
+      case 3: return this.str();
+      case 4: return { name: this.str(), libraryId: this.i32() };
+      case 5: return null;
+      case 6: return null;
+      case 7: return this.u8();
+      default: throw new Error('Unsupported binary type '+bt);
+    }
+  }
+  readMemberValue(bt, ai){
+    if(bt === 0) return this.readPrimitive(ai);
+    return this.readRecord();
+  }
+  readRecord(){
+    const rt = this.u8();
+    switch(rt){
+      case 1:  return this.readClassWithId();
+      case 4:  return this.readClassWithMembersAndTypes(true);
+      case 5:  return this.readClassWithMembersAndTypes(false);
+      case 6:  return this.readBinaryObjectString();
+      case 7:  return this.readBinaryArray();
+      case 8:  return this.readMemberPrimitiveTyped();
+      case 9:  return this.readMemberReference();
+      case 10: return null;
+      case 11: throw new Error('__MSG_END__');
+      case 12: this.readBinaryLibrary(); return this.readRecord();
+      case 15: return this.readArraySinglePrimitive();
+      case 16: return this.readArraySingleObject();
+      case 17: return this.readArraySingleString();
+      default: throw new Error('Unknown record type: '+rt);
+    }
+  }
+  readBinaryLibrary(){
+    const id = this.i32(), name = this.str();
+    this.libraries.set(id, name);
+  }
+  readClassWithMembersAndTypes(isSystem){
+    const oid = this.i32();
+    const className = this.str();
+    const mc = this.i32();
+    const names = []; for(let i=0;i<mc;i++) names.push(this.str());
+    const bts = []; for(let i=0;i<mc;i++) bts.push(this.u8());
+    const ais = []; for(let i=0;i<mc;i++) ais.push(this.readAddInfo(bts[i]));
+    const libId = isSystem ? 0 : this.i32();
+    const obj = { _id: oid, _class: className };
+    this.objects.set(oid, obj);
+    this.classMeta.set(oid, { className, names, bts, ais, libId });
+    for(let i=0;i<mc;i++){
+      obj[names[i]] = this.readMemberValue(bts[i], ais[i]);
+    }
+    return obj;
+  }
+  readClassWithId(){
+    const oid = this.i32(), metaId = this.i32();
+    const meta = this.classMeta.get(metaId);
+    if(!meta) throw new Error('Unknown metadataId '+metaId);
+    const obj = { _id: oid, _class: meta.className };
+    this.objects.set(oid, obj);
+    for(let i=0;i<meta.names.length;i++){
+      obj[meta.names[i]] = this.readMemberValue(meta.bts[i], meta.ais[i]);
+    }
+    return obj;
+  }
+  readBinaryObjectString(){
+    const id = this.i32(), v = this.str();
+    this.objects.set(id, v);
+    return v;
+  }
+  readMemberReference(){
+    return { __ref: this.i32() };
+  }
+  readMemberPrimitiveTyped(){
+    const t = this.u8();
+    return this.readPrimitive(t);
+  }
+  readArraySingleObject(){
+    const id = this.i32(), len = this.i32();
+    const arr = [];
+    this.objects.set(id, arr);
+    let i = 0;
+    while(i < len){
+      const v = this.readRecord();
+      if(Array.isArray(v) && v.__nulls){
+        for(let k=0;k<v.length && i<len;k++,i++) arr.push(null);
+      } else {
+        arr.push(v); i++;
+      }
+    }
+    return arr;
+  }
+  readArraySinglePrimitive(){
+    const id = this.i32(), len = this.i32(), t = this.u8();
+    const arr = [];
+    this.objects.set(id, arr);
+    for(let i=0;i<len;i++) arr.push(this.readPrimitive(t));
+    return arr;
+  }
+  readArraySingleString(){
+    const id = this.i32(), len = this.i32();
+    const arr = [];
+    this.objects.set(id, arr);
+    for(let i=0;i<len;i++){
+      const r = this.readRecord();
+      if(Array.isArray(r) && r.__nulls){
+        for(let k=0;k<r.length;k++) arr.push(null);
+      } else arr.push(r);
+    }
+    return arr;
+  }
+  readBinaryArray(){
+    const id = this.i32();
+    const bat = this.u8();
+    const rank = this.i32();
+    const lengths = []; for(let i=0;i<rank;i++) lengths.push(this.i32());
+    if(bat === 3 || bat === 4 || bat === 5){
+      for(let i=0;i<rank;i++) this.i32();
+    }
+    const et = this.u8();
+    const ai = this.readAddInfo(et);
+    const total = lengths.reduce((a,b)=>a*b, 1);
+    const arr = [];
+    this.objects.set(id, arr);
+    let i = 0;
+    while(i < total){
+      let v;
+      if(et === 0) { v = this.readPrimitive(ai); arr.push(v); i++; continue; }
+      v = this.readRecord();
+      if(Array.isArray(v) && v.__nulls){
+        for(let k=0;k<v.length && i<total;k++,i++) arr.push(null);
+      } else { arr.push(v); i++; }
+    }
+    return arr;
+  }
+  parse(){
+    this.readHeader();
+    try {
+      while(true) this.readRecord();
+    } catch(e) {
+      if(e.message !== '__MSG_END__') throw e;
+    }
+    return this.resolve(this.objects.get(this.rootId));
+  }
+  resolve(o, seen = new Map()){
+    if(o === null || o === undefined) return o;
+    if(typeof o !== 'object') return o;
+    if(seen.has(o)) return seen.get(o);
+    if(o.__ref !== undefined && Object.keys(o).length === 1){
+      const t = this.objects.get(o.__ref);
+      if(t === undefined) return null;
+      return this.resolve(t, seen);
+    }
+    if(Array.isArray(o)){
+      const r = []; seen.set(o, r);
+      for(const it of o) r.push(this.resolve(it, seen));
+      return r;
+    }
+    const r = {}; seen.set(o, r);
+    for(const k of Object.keys(o)) r[k] = this.resolve(o[k], seen);
+    return r;
+  }
+}
+
+/* ============================================================
+   Prefab Map (loaded async)
+   ============================================================ */
+let PREFAB_MAP = null;
+async function loadMap(){
+  if(PREFAB_MAP) return PREFAB_MAP;
+  try {
+    const res = await fetch('./prefab_map.json');
+    PREFAB_MAP = await res.json();
+  } catch(e){
+    console.error('Failed to load prefab map', e);
+    PREFAB_MAP = {};
+  }
+  return PREFAB_MAP;
+}
+loadMap();
+
+function lookup(id){
+  if(!PREFAB_MAP) return { n: 'ID '+id, c: 'Unknown' };
+  const e = PREFAB_MAP[String(id)];
+  return e || { n: 'unknown('+id+')', c: 'Unknown' };
+}
+
+/* ============================================================
+   Extract WeaponisedAnimalPrefab into analyzed summary
+   ============================================================ */
+function analyze(parsed){
+  if(!parsed || parsed._class !== 'WeaponisedAnimalPrefab'){
+    throw new Error('Not a WeaponisedAnimalPrefab (root class: ' + (parsed?._class || 'unknown') + ')');
+  }
+  const name = parsed.prefabName;
+  const rec = parsed.animalRecord;
+  if(!rec || !rec._class || !rec._class.includes('MapUnitRecord')){
+    throw new Error('animalRecord missing or invalid');
+  }
+  const props = flatProps(rec.props);
+  const baseIdx = rec.unitPrefabIndex;
+  const baseInfo = lookup(baseIdx);
+  const hp = (props[2] ?? 100) / 100;
+  const dmg = (props[3] ?? 100) / 100;
+  const scale = (props[4] ?? 100000) / 100000;
+  const ai = props[0] ?? 0;
+  const detect = props[1] ?? 100;
+  const team = rec.team ?? 0;
+
+  // weapons
+  const weapons = [];
+  let i = 100;
+  while(props[i] !== undefined){
+    weapons.push({
+      idx: props[i],
+      scale: (props[i+1] ?? 0) / 100000,
+      dmg: (props[i+2] ?? 0) / 100000,
+      parent: props[i+10] ?? 0
+    });
+    i += 11;
+  }
+  // aggregate by (idx, scale, dmg)
+  const agg = new Map();
+  for(const w of weapons){
+    const key = w.idx + '|' + w.scale.toFixed(4) + '|' + w.dmg.toFixed(4);
+    if(!agg.has(key)){
+      const info = lookup(w.idx);
+      agg.set(key, { ...w, count: 0, name: info.n, category: info.c });
+    }
+    agg.get(key).count++;
+  }
+  const list = Array.from(agg.values()).sort((a,b)=>b.count - a.count);
+
+  return {
+    name, baseIdx, baseInfo,
+    hp, dmg, scale, ai, detect, team,
+    weaponCount: weapons.length,
+    uniqueWeapons: list.length,
+    weapons: list
+  };
+}
+
+// Convert NRBF Dictionary form into a plain {int: int} object
+function flatProps(propsObj){
+  const out = {};
+  if(!propsObj) return out;
+  const pairs = propsObj.KeyValuePairs;
+  if(!Array.isArray(pairs)) return out;
+  for(const p of pairs){
+    if(p && p.key !== undefined && p.value !== undefined){
+      out[p.key] = p.value;
+    }
+  }
+  return out;
+}
+
+/* ============================================================
+   Rendering
+   ============================================================ */
+const state = { items: [], sort: 'name' };
+
+function render(){
+  const results = document.getElementById('results');
+  const empty = document.getElementById('empty');
+  const tb = document.getElementById('toolbar');
+  results.innerHTML = '';
+
+  if(state.items.length === 0){
+    empty.style.display = '';
+    tb.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  tb.style.display = '';
+
+  const items = [...state.items];
+  if(state.sort === 'weapons') items.sort((a,b)=> (b.summary?.weaponCount ?? -1) - (a.summary?.weaponCount ?? -1));
+  else if(state.sort === 'hp') items.sort((a,b)=> (b.summary?.hp ?? -1) - (a.summary?.hp ?? -1));
+  else if(state.sort === 'dmg') items.sort((a,b)=> (b.summary?.dmg ?? -1) - (a.summary?.dmg ?? -1));
+  else items.sort((a,b)=> (a.summary?.name || a.filename).localeCompare(b.summary?.name || b.filename));
+
+  document.getElementById('count').textContent = state.items.length + ' files loaded';
+
+  for(const it of items){
+    results.appendChild(renderItem(it));
+  }
+}
+
+function renderItem(it){
+  const div = document.createElement('div');
+  div.className = 'result' + (it.error ? ' error' : '');
+
+  if(it.error){
+    div.innerHTML = '<div class="result-head"><div><div class="label">FILE</div><div class="name">'+escapeHTML(it.filename)+'</div></div><div style="grid-column:2/-1;color:var(--red);font-size:13px">'+escapeHTML(it.error)+'</div></div>';
+    return div;
+  }
+
+  const s = it.summary;
+  const head = document.createElement('div');
+  head.className = 'result-head';
+  head.innerHTML =
+    '<div><div class="label">PREFAB NAME</div><div class="name">'+escapeHTML(s.name || it.filename)+'</div></div>' +
+    '<div><div class="label">BASE UNIT</div><div class="val">'+escapeHTML(s.baseInfo.n)+' <span style="color:var(--text-muted);font-size:11px">#'+s.baseIdx+'</span></div></div>' +
+    '<div><div class="label">HP MULTI</div><div class="val hp">'+fmt(s.hp)+'×</div></div>' +
+    '<div><div class="label">DMG MULTI</div><div class="val dmg">'+fmt(s.dmg)+'×</div></div>' +
+    '<div><div class="label">WEAPONS</div><div class="val weapons">'+s.weaponCount+' <span style="color:var(--text-muted);font-size:11px">('+s.uniqueWeapons+' kinds)</span></div></div>' +
+    '<div class="toggle">▶</div>';
+  head.addEventListener('click', ()=>{
+    div.classList.toggle('open');
+  });
+  div.appendChild(head);
+
+  const body = document.createElement('div');
+  body.className = 'result-body';
+  body.innerHTML =
+    '<div class="meta-row">' +
+      '<span><b>Scale:</b>'+fmt(s.scale)+'×</span>' +
+      '<span><b>AI override:</b>'+s.ai+'</span>' +
+      '<span><b>Detection range:</b>'+s.detect+'m</span>' +
+      '<span><b>Team:</b>'+s.team+'</span>' +
+      '<span><b>File:</b>'+escapeHTML(it.filename)+'</span>' +
+    '</div>';
+
+  if(s.weapons.length === 0){
+    body.innerHTML += '<div style="color:var(--text-muted);padding:12px 0">装着武器なし</div>';
+  } else {
+    let tbl = '<table class="weapons"><thead><tr>' +
+      '<th>Category</th><th>Part Name</th><th class="num">ID</th>' +
+      '<th class="num">Scale</th><th class="num">DMG Multi</th><th class="num">Count</th></tr></thead><tbody>';
+    for(const w of s.weapons){
+      const catClass = w.category.replace(/\s+/g, '');
+      tbl += '<tr>' +
+        '<td><span class="cat '+catClass+'">'+escapeHTML(w.category)+'</span></td>' +
+        '<td>'+escapeHTML(w.name)+'</td>' +
+        '<td class="num">'+w.idx+'</td>' +
+        '<td class="num">'+fmt(w.scale)+'×</td>' +
+        '<td class="num">'+fmt(w.dmg)+'×</td>' +
+        '<td class="num count">×'+w.count+'</td>' +
+        '</tr>';
+    }
+    tbl += '</tbody></table>';
+    body.innerHTML += tbl;
+  }
+  div.appendChild(body);
+  return div;
+}
+
+function fmt(v){
+  if(v === Math.round(v)) return v.toString();
+  return parseFloat(v.toFixed(4)).toString();
+}
+function escapeHTML(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ============================================================
+   File handling
+   ============================================================ */
+async function handleFiles(fileList){
+  await loadMap();
+  for(const f of fileList){
+    if(f.name.toLowerCase().endsWith('.jpg') || f.name.toLowerCase().endsWith('.png')){
+      continue;
+    }
+    const item = { filename: f.name };
+    state.items.push(item);
+    try {
+      const buf = await f.arrayBuffer();
+      const reader = new NRBFReader(buf);
+      const parsed = reader.parse();
+      item.summary = analyze(parsed);
+    } catch(e){
+      item.error = e.message;
+      console.error(f.name, e);
+    }
+  }
+  render();
+}
+
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+drop.addEventListener('click', ()=>fileInput.click());
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
+drop.addEventListener('dragleave', e => drop.classList.remove('dragover'));
+drop.addEventListener('drop', e => {
+  e.preventDefault();
+  drop.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+
+document.getElementById('expandAll').addEventListener('click', ()=>{
+  document.querySelectorAll('.result').forEach(el=>el.classList.add('open'));
+});
+document.getElementById('collapseAll').addEventListener('click', ()=>{
+  document.querySelectorAll('.result').forEach(el=>el.classList.remove('open'));
+});
+document.getElementById('clear').addEventListener('click', ()=>{
+  state.items = []; render();
+});
+document.getElementById('sort').addEventListener('change', e=>{
+  state.sort = e.target.value; render();
+});
+
+render();
+</script>
+
+</body>
+</html>
