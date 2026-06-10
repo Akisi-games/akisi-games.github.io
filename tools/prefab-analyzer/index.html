@@ -40,13 +40,16 @@ h1 { margin: 0 0 8px 0; font-size: 40px; letter-spacing: 2px; }
 .subtitle code { background: var(--bg-soft); padding: 2px 8px; border-radius: 4px; font-size: 13px; color: var(--cyan); }
 
 .drop {
+  display: block;
+  width: 100%;
   border: 2px dashed var(--border);
   border-radius: 14px;
-  padding: 48px 24px;
+  padding: 64px 24px;
   text-align: center;
   cursor: pointer;
   transition: all .15s ease;
   background: linear-gradient(180deg, transparent, var(--bg-soft) 100%);
+  box-sizing: border-box;
 }
 .drop:hover, .drop.dragover {
   border-color: var(--cyan);
@@ -54,7 +57,13 @@ h1 { margin: 0 0 8px 0; font-size: 40px; letter-spacing: 2px; }
 }
 .drop .big { font-size: 24px; font-weight: 900; margin-bottom: 8px; }
 .drop .small { color: var(--text-soft); font-size: 13px; }
-.drop input { display: none; }
+.drop input[type="file"] {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
 
 .toolbar {
   display: flex; gap: 16px; margin: 32px 0 16px; flex-wrap: wrap; align-items: center;
@@ -146,6 +155,17 @@ table.weapons .dmg-input:focus { outline: none; border-color: var(--cyan); }
 table.weapons .dmg-input.changed { border-color: var(--yellow); color: var(--yellow); }
 table.weapons tr.non-weapon { opacity: 0.45; }
 table.weapons tr.non-weapon .dmg-input { background: transparent; border-color: var(--border-soft); color: var(--text-muted); }
+table.weapons tr.deleted { opacity: 0.3; text-decoration: line-through; }
+table.weapons tr.deleted .dmg-input { background: transparent; color: var(--text-muted); }
+table.weapons .del-btn {
+  background: transparent; color: var(--red); border: 1px solid var(--red);
+  border-radius: 4px; padding: 3px 10px; font-size: 11px; cursor: pointer;
+  font-weight: 700; letter-spacing: 1px;
+}
+table.weapons .del-btn:hover { background: var(--red); color: #000; }
+table.weapons .del-btn.undo { color: var(--cyan); border-color: var(--cyan); }
+table.weapons .del-btn.undo:hover { background: var(--cyan); color: #000; }
+table.weapons .part-name-en { color: var(--text-muted); font-size: 11px; margin-left: 6px; }
 
 .error-msg { padding: 24px; color: var(--red); font-size: 14px; }
 
@@ -445,10 +465,13 @@ class NRBFReader {
   }
   // Get the value offset for a member of a resolved object
   getValueOffset(resolvedObj, memberName) {
-    // resolvedObj has _id (copied through resolve)
     if(!resolvedObj || resolvedObj._id === undefined) return null;
     const map = this.fieldOffsets.get(resolvedObj._id);
     return map ? map[memberName] : null;
+  }
+  // Get the offset of ANY primitive field on the resolved KeyValuePair (key or value)
+  getFieldOffset(resolvedObj, memberName) {
+    return this.getValueOffset(resolvedObj, memberName);
   }
 }
 
@@ -456,21 +479,33 @@ class NRBFReader {
    Prefab Map
    ============================================================ */
 let PREFAB_MAP = null;
-let PREFAB_MAP_PROMISE = null;
+let PREFAB_JA = null;
+let MAPS_PROMISE = null;
 function loadMap(){
-  if(!PREFAB_MAP_PROMISE){
-    PREFAB_MAP_PROMISE = fetch('./prefab_map.json?v=3')
-      .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-      .then(m => { PREFAB_MAP = m; return m; })
-      .catch(e => { console.error('Failed to load prefab map', e); PREFAB_MAP_PROMISE = null; PREFAB_MAP = null; return {}; });
+  if(!MAPS_PROMISE){
+    MAPS_PROMISE = Promise.all([
+      fetch('./prefab_map.json?v=4').then(r => r.ok ? r.json() : {}),
+      fetch('./prefab_ja.json?v=4').then(r => r.ok ? r.json() : {})
+    ]).then(([m, ja]) => {
+      PREFAB_MAP = m; PREFAB_JA = ja;
+      return { m, ja };
+    }).catch(e => {
+      console.error('Failed to load maps', e);
+      MAPS_PROMISE = null;
+      return { m: {}, ja: {} };
+    });
   }
-  return PREFAB_MAP_PROMISE;
+  return MAPS_PROMISE;
 }
 loadMap();
 
 function lookup(id){
-  if(!PREFAB_MAP) return { n: 'ID '+id, c: 'Unknown' };
-  return PREFAB_MAP[String(id)] || { n: 'unknown('+id+')', c: 'UnknownPart' };
+  const sid = String(id);
+  if(!PREFAB_MAP) return { n: 'ID '+id, c: 'Unknown', en: null };
+  const entry = PREFAB_MAP[sid];
+  if(!entry) return { n: 'unknown('+id+')', c: 'UnknownPart', en: null };
+  const ja = PREFAB_JA?.[sid];
+  return { n: ja || entry.n, en: ja ? entry.n : null, c: entry.c };
 }
 
 /* ============================================================
@@ -491,12 +526,13 @@ function analyze(parsed, reader){
   const pairsRaw = rec.props?.KeyValuePairs;
   if(!Array.isArray(pairsRaw)) throw new Error('props.KeyValuePairs missing');
 
-  // Map: propKey -> { value, offset (for value), pairObj }
+  // Map: propKey -> { value, offset (for value), keyOffset (for key), pairObj }
   const propMap = new Map();
   for(const p of pairsRaw){
     if(p && p.key !== undefined && p.value !== undefined){
       const offset = reader.getValueOffset(p, 'value');
-      propMap.set(p.key, { value: p.value, offset, pairObj: p });
+      const keyOffset = reader.getFieldOffset(p, 'key');
+      propMap.set(p.key, { value: p.value, offset, keyOffset, pairObj: p });
     }
   }
 
@@ -520,16 +556,21 @@ function analyze(parsed, reader){
     const parentP = propMap.get(i+10);
     const rawDmg = dmgP?.value ?? 0;
     const dmgFloat = rawDmg / 100000;
+    // 11個の key offsets を集める（key=i, i+1, ..., i+10）
+    const keyOffsets = [];
+    for(let k = 0; k < 11; k++){
+      const p = propMap.get(i + k);
+      keyOffsets.push(p?.keyOffset ?? null);
+    }
     weapons.push({
       idx: wIdx,
       scale: (scaleP?.value ?? 0) / 100000,
-      dmgRaw: rawDmg,                                  // raw int (×100000)
-      dmgOffset: dmgP?.offset ?? null,                 // byte offset to write to
+      dmgRaw: rawDmg,
+      dmgOffset: dmgP?.offset ?? null,
       dmg: dmgFloat,
       parent: parentP?.value ?? 0,
       blockStart: i,
-      // 武器判定: 既知の武器IDリスト OR DMG倍率がデフォルト(1.0)以外
-      // → 「明確に武器」または「ユーザーが意図的にDMGを変えた」パーツを拾う
+      keyOffsets,                                     // 11個の key の byte offset
       isWeapon: WEAPON_IDS.has(wIdx) || Math.abs(dmgFloat - 1.0) > 0.0001
     });
     i += 11;
@@ -542,7 +583,7 @@ function analyze(parsed, reader){
       const info = lookup(w.idx);
       agg.set(key, {
         idx: w.idx, scale: w.scale, dmg: w.dmg, dmgRaw: w.dmgRaw,
-        count: 0, instances: [], name: info.n, category: info.c, isWeapon: w.isWeapon
+        count: 0, instances: [], name: info.n, nameEn: info.en, category: info.c, isWeapon: w.isWeapon
       });
     }
     const g = agg.get(key);
@@ -562,7 +603,8 @@ function analyze(parsed, reader){
     weaponCount: weapons.length,
     uniqueWeapons: list.length,
     weaponOnlyCount, weaponOnlyKinds,
-    weapons: list
+    weapons: list,
+    allWeaponBlocks: weapons   // 順序通りのフラット配列（blockStart で識別）
   };
 }
 
@@ -578,6 +620,39 @@ function applyEdits(originalBytes, edits){
     view.setInt32(e.offset, e.newRawValue, true);
   }
   return copy;
+}
+
+/* 削除と並べ替えのロジックを計算する：
+   allWeaponBlocks（順序通り）と deletedSet（削除対象の blockStart）から、
+   key の書き換え計画を作る。
+   - 残るブロックは順番に i=100, 111, 122... に再配置
+   - 削除対象は key を 999000+元番号 のような未使用領域に追放
+*/
+function computeRearrangeEdits(allWeaponBlocks, deletedSet){
+  const edits = []; // {offset, newRawValue}
+  let newIndex = 100;
+  for(const block of allWeaponBlocks){
+    const isDeleted = deletedSet.has(block.blockStart);
+    if(isDeleted){
+      // 削除：keyを999000+元番号 のような未使用領域に書き換え
+      // （ARBSのループからは見えなくなる）
+      for(let k = 0; k < 11; k++){
+        const off = block.keyOffsets[k];
+        if(off == null) continue;
+        edits.push({ offset: off, newRawValue: 990000 + block.blockStart + k });
+      }
+    } else {
+      // 残す：newIndex に再配置（i=100, 111, 122...）
+      for(let k = 0; k < 11; k++){
+        const off = block.keyOffsets[k];
+        if(off == null) continue;
+        const newKey = newIndex + k;
+        edits.push({ offset: off, newRawValue: newKey });
+      }
+      newIndex += 11;
+    }
+  }
+  return edits;
 }
 
 /* ==================   Rendering & State
@@ -668,20 +743,27 @@ function renderItem(it){
     tbl.className = 'weapons';
     tbl.innerHTML =
       '<thead><tr>' +
-      '<th>Category</th><th>Part Name</th><th class="num">ID</th>' +
-      '<th class="num">Scale</th><th class="num">DMG倍率（編集可）</th><th class="num">Count</th></tr></thead>';
+      '<th>カテゴリ</th><th>パーツ名</th><th class="num">ID</th>' +
+      '<th class="num">スケール</th><th class="num">DMG倍率（編集可）</th>' +
+      '<th class="num">個数</th><th class="num">削除</th></tr></thead>';
     const tbody = document.createElement('tbody');
     weaponsToShow.forEach(w => {
       const tr = document.createElement('tr');
+      const groupIdx = s.weapons.indexOf(w);
+      const allDeleted = w.instances.every(inst => it.deleted && it.deleted.has(inst.blockStart));
       if(!w.isWeapon) tr.className = 'non-weapon';
+      if(allDeleted) tr.classList.add('deleted');
       const catClass = w.category.replace(/\s+/g, '');
+      const nameHtml = escapeHTML(w.name) +
+        (w.nameEn ? '<span class="part-name-en">' + escapeHTML(w.nameEn) + '</span>' : '');
       tr.innerHTML =
         '<td><span class="cat '+catClass+'">'+escapeHTML(w.category)+'</span></td>' +
-        '<td>'+escapeHTML(w.name)+'</td>' +
+        '<td>'+nameHtml+'</td>' +
         '<td class="num">'+w.idx+'</td>' +
         '<td class="num">'+fmt(w.scale)+'×</td>' +
         '<td class="num"></td>' +
-        '<td class="num count">×'+w.count+'</td>';
+        '<td class="num count">×'+w.count+'</td>' +
+        '<td class="num"></td>';
       const dmgCell = tr.children[4];
       const input = document.createElement('input');
       input.type = 'number';
@@ -689,10 +771,19 @@ function renderItem(it){
       input.className = 'dmg-input';
       input.value = fmt(w.dmg);
       input.dataset.itemId = it.id;
-      input.dataset.groupIdx = String(s.weapons.indexOf(w));
-      input.disabled = !w.isWeapon;
+      input.dataset.groupIdx = String(groupIdx);
+      input.disabled = !w.isWeapon || allDeleted;
       input.addEventListener('input', onDmgInput);
       dmgCell.appendChild(input);
+      // 削除/復元ボタン
+      const delCell = tr.children[6];
+      const delBtn = document.createElement('button');
+      delBtn.className = 'del-btn' + (allDeleted ? ' undo' : '');
+      delBtn.textContent = allDeleted ? '復元' : '削除';
+      delBtn.dataset.itemId = it.id;
+      delBtn.dataset.groupIdx = String(groupIdx);
+      delBtn.addEventListener('click', onDeleteToggle);
+      delCell.appendChild(delBtn);
       tbody.appendChild(tr);
     });
     tbl.appendChild(tbody);
@@ -714,6 +805,7 @@ function renderItem(it){
       });
     } else if(action === 'reset'){
       it.edits = new Map();
+      it.deleted = new Set();
       it.modified = false;
       render();
     } else if(action === 'download'){
@@ -750,22 +842,62 @@ function onDmgInput(e){
       item.edits.delete(inst.blockStart + 2);
     }
   }
-  const wasModified = item.modified;
-  item.modified = item.edits.size > 0;
+  updateModifiedState(item);
+}
+
+function onDeleteToggle(e){
+  const btn = e.target;
+  const itemId = btn.dataset.itemId;
+  const gIdx = parseInt(btn.dataset.groupIdx, 10);
+  const item = state.items.find(x => x.id === itemId);
+  if(!item) return;
+  const group = item.summary.weapons[gIdx];
+  if(!group) return;
+  if(!item.deleted) item.deleted = new Set();
+  const allCurrentlyDeleted = group.instances.every(inst => item.deleted.has(inst.blockStart));
+  if(allCurrentlyDeleted){
+    for(const inst of group.instances) item.deleted.delete(inst.blockStart);
+  } else {
+    for(const inst of group.instances) item.deleted.add(inst.blockStart);
+  }
+  updateModifiedState(item);
+  render();
+}
+
+function updateModifiedState(item){
+  const hasEdits = item.edits && item.edits.size > 0;
+  const hasDeletions = item.deleted && item.deleted.size > 0;
+  item.modified = hasEdits || hasDeletions;
+  const result = document.querySelector('[data-result-id="'+item.id+'"]');
+  if(result) result.classList.toggle('modified', item.modified);
   const dl = document.getElementById('dl-'+item.id);
   const info = document.getElementById('info-'+item.id);
   if(dl) dl.disabled = !item.modified;
-  if(info) info.textContent = item.modified ? (item.edits.size + ' 武器を変更') : '変更なし';
-  if(wasModified !== item.modified){
-    const result = document.querySelector('[data-result-id="'+item.id+'"]');
-    if(result) result.classList.toggle('modified', item.modified);
+  if(info){
+    const parts = [];
+    if(item.edits && item.edits.size) parts.push(item.edits.size + ' 武器の倍率変更');
+    if(item.deleted && item.deleted.size) parts.push(item.deleted.size + ' 武器を削除');
+    info.textContent = parts.length ? parts.join(' / ') : '変更なし';
   }
 }
 
 function downloadModified(item){
-  if(!item.modified || !item.edits || item.edits.size === 0) return;
-  const edits = Array.from(item.edits.values());
-  const modified = applyEdits(item.originalBytes, edits);
+  if(!item.modified) return;
+  const deletedSet = item.deleted || new Set();
+  const allBlocks = item.summary.allWeaponBlocks || [];
+  const rearrangeEdits = (deletedSet.size > 0)
+    ? computeRearrangeEdits(allBlocks, deletedSet)
+    : [];
+  const dmgEdits = [];
+  if(item.edits){
+    for(const [blockKey, e] of item.edits){
+      const blockStart = blockKey - 2;
+      if(deletedSet.has(blockStart)) continue;
+      dmgEdits.push(e);
+    }
+  }
+  const allEdits = [...rearrangeEdits, ...dmgEdits];
+  const modified = applyEdits(item.originalBytes, allEdits);
   const blob = new Blob([modified], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -785,9 +917,6 @@ function escapeHTML(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-/* ============================================================
-   File handling
-   ============================================================ */
 let nextItemId = 1;
 async function handleFiles(fileList){
   await loadMap();
@@ -796,7 +925,7 @@ async function handleFiles(fileList){
       continue;
     }
     const id = 'it'+(nextItemId++);
-    const item = { id, filename: f.name, edits: new Map(), modified: false };
+    const item = { id, filename: f.name, edits: new Map(), deleted: new Set(), modified: false };
     state.items.push(item);
     try {
       const buf = await f.arrayBuffer();
@@ -814,7 +943,10 @@ async function handleFiles(fileList){
 
 const drop = document.getElementById('drop');
 const fileInput = document.getElementById('file');
-drop.addEventListener('click', ()=>fileInput.click());
+drop.addEventListener('click', e => {
+  if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+  fileInput.click();
+});
 fileInput.addEventListener('change', e => handleFiles(e.target.files));
 drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
 drop.addEventListener('dragleave', e => drop.classList.remove('dragover'));
