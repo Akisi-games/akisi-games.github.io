@@ -10,6 +10,7 @@
   --bg: #06060c;
   --bg-soft: #0d0d18;
   --bg-card: #11111e;
+  --bg-edit: #1a1a2e;
   --border: #1f1f33;
   --border-soft: #181828;
   --text: #e6e7f0;
@@ -31,7 +32,6 @@ a:hover { text-decoration: underline; }
 .nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 32px; border-bottom: 1px solid var(--border); }
 .brand { display: flex; align-items: center; gap: 12px; font-weight: 900; letter-spacing: 4px; }
 .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
-.brand-text { color: var(--text); }
 .nav .crumb { color: var(--text-soft); font-size: 13px; letter-spacing: 2px; }
 
 .wrap { max-width: 1280px; margin: 0 auto; padding: 48px 32px; }
@@ -69,6 +69,8 @@ h1 { margin: 0 0 8px 0; font-size: 40px; letter-spacing: 2px; }
   cursor: pointer;
 }
 .toolbar button:hover { border-color: var(--cyan); color: var(--cyan); }
+.toolbar label.checkbox { display: inline-flex; align-items: center; gap: 6px; color: var(--text-soft); font-size: 13px; cursor: pointer; }
+.toolbar label.checkbox input { accent-color: var(--cyan); }
 .toolbar .count { color: var(--text-soft); font-size: 13px; margin-left: auto; }
 
 .results { display: grid; gap: 16px; }
@@ -79,6 +81,7 @@ h1 { margin: 0 0 8px 0; font-size: 40px; letter-spacing: 2px; }
   overflow: hidden;
 }
 .result.error { border-color: var(--red); }
+.result.modified { border-color: var(--yellow); }
 .result-head {
   padding: 20px 24px;
   display: grid;
@@ -90,11 +93,11 @@ h1 { margin: 0 0 8px 0; font-size: 40px; letter-spacing: 2px; }
 }
 .result-head:hover { background: var(--bg-soft); }
 .result-head .name { font-weight: 900; font-size: 18px; word-break: break-all; }
+.result-head .name .mod-flag { display: inline-block; background: var(--yellow); color: #000; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-left: 8px; font-weight: 900; letter-spacing: 1px; }
 .result-head .label { font-size: 11px; color: var(--text-muted); letter-spacing: 1.5px; }
 .result-head .val { font-size: 14px; color: var(--text); }
 .result-head .val.hp { color: var(--green); }
 .result-head .val.dmg { color: var(--red); }
-.result-head .val.scale { color: var(--yellow); }
 .result-head .val.weapons { color: var(--cyan); font-weight: 900; }
 .result-head .toggle { color: var(--text-soft); font-size: 18px; transition: transform .2s; }
 .result.open .toggle { transform: rotate(90deg); color: var(--cyan); }
@@ -105,19 +108,44 @@ h1 { margin: 0 0 8px 0; font-size: 40px; letter-spacing: 2px; }
 .meta-row { display: flex; gap: 24px; margin: 16px 0; flex-wrap: wrap; color: var(--text-soft); font-size: 12px; }
 .meta-row span b { color: var(--text); margin-right: 6px; }
 
+.body-toolbar { display: flex; gap: 12px; align-items: center; margin: 16px 0 8px; flex-wrap: wrap; }
+.body-toolbar .info { color: var(--text-soft); font-size: 12px; }
+.body-toolbar .quick-set { display: inline-flex; align-items: center; gap: 6px; }
+.body-toolbar input.quick-input {
+  background: var(--bg-edit); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 10px; width: 70px; font-size: 13px; text-align: right;
+}
+.body-toolbar button {
+  background: var(--bg-card); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer;
+}
+.body-toolbar button:hover { border-color: var(--cyan); color: var(--cyan); }
+.body-toolbar button.primary { background: var(--cyan); color: #000; border-color: var(--cyan); font-weight: 900; }
+.body-toolbar button.primary:hover { background: #80f7ff; color: #000; }
+.body-toolbar button.primary:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; border-color: var(--border); }
+
 table.weapons { width: 100%; border-collapse: collapse; margin-top: 12px; }
 table.weapons th, table.weapons td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
 table.weapons th { color: var(--text-muted); font-weight: 500; letter-spacing: 1px; font-size: 11px; text-transform: uppercase; }
 table.weapons tr:hover { background: var(--bg-soft); }
 table.weapons .cat { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; letter-spacing: 1px; }
 table.weapons .cat.UnitCreator { background: #00f0ff22; color: var(--cyan); }
-table.weapons .cat.Animals { background: #fff20022; color: var(--yellow); }
 table.weapons .cat.Weapons { background: #ff305022; color: var(--red); }
+table.weapons .cat.Animals { background: #fff20022; color: var(--yellow); }
 table.weapons .cat.Buildings { background: #3fd97a22; color: var(--green); }
 table.weapons .cat.Landscape { background: #ff913322; color: var(--orange); }
-table.weapons .cat.Unknown { background: #88888822; color: var(--text-soft); }
+table.weapons .cat.Unknown, table.weapons .cat.UnknownPart { background: #88888822; color: var(--text-soft); }
 table.weapons .num { text-align: right; font-variant-numeric: tabular-nums; }
 table.weapons .count { font-weight: 900; color: var(--cyan); }
+table.weapons .dmg-input {
+  background: var(--bg-edit); color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; padding: 4px 8px; width: 80px; font-size: 13px; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+table.weapons .dmg-input:focus { outline: none; border-color: var(--cyan); }
+table.weapons .dmg-input.changed { border-color: var(--yellow); color: var(--yellow); }
+table.weapons tr.non-weapon { opacity: 0.45; }
+table.weapons tr.non-weapon .dmg-input { background: transparent; border-color: var(--border-soft); color: var(--text-muted); }
 
 .error-msg { padding: 24px; color: var(--red); font-size: 14px; }
 
@@ -136,7 +164,7 @@ footer { padding: 32px; text-align: center; color: var(--text-muted); font-size:
 <nav class="nav">
   <div class="brand">
     <span class="dot"></span>
-    <span class="brand-text">AKISI</span>
+    <span>AKISI</span>
     <span class="crumb">/ TOOLS / PREFAB ANALYZER</span>
   </div>
   <a href="/">← Back to AKISI</a>
@@ -145,8 +173,8 @@ footer { padding: 32px; text-align: center; color: var(--text-muted); font-size:
 <div class="wrap">
   <h1>Prefab Analyzer</h1>
   <p class="subtitle">
-    Animal Revolt Battle Simulator の <code>WEP_ANIM_PREF_*</code> ファイルを解析し、
-    ベースユニット・HP/攻撃倍率・スケール・装着武器の集計を一覧表示します。
+    ARBS の <code>WEP_ANIM_PREF_*</code> ファイルを解析し、ベースユニット・HP/攻撃倍率・スケール・装着武器を一覧表示。
+    武器の攻撃倍率は<strong style="color:var(--yellow)">編集してダウンロード可能</strong>。
     <br>すべての処理はブラウザ内で完結します（ファイルはサーバーに送信されません）。
   </p>
 
@@ -165,6 +193,7 @@ footer { padding: 32px; text-align: center; color: var(--text-muted); font-size:
       <option value="hp">並び順：HP倍率（高い順）</option>
       <option value="dmg">並び順：攻撃倍率（高い順）</option>
     </select>
+    <label class="checkbox"><input type="checkbox" id="showAll" /> 装飾パーツも表示</label>
     <button id="clear">クリア</button>
     <span class="count" id="count"></span>
   </div>
@@ -174,13 +203,18 @@ footer { padding: 32px; text-align: center; color: var(--text-muted); font-size:
 </div>
 
 <footer>
-  <div>AKISI Tools / Prefab Analyzer</div>
-  <div>Prefab map: 1375 entries extracted from Assembly-CSharp.dll</div>
+  <div>AKISI Tools / Prefab Analyzer (Edit Mode)</div>
+  <div>Prefab map: 1375 entries / Weapon list: 131 attack-capable parts (extracted from Assembly-CSharp.dll)</div>
 </footer>
 
 <script>
 /* ============================================================
-   NRBF Parser (subset, sufficient for WeaponisedAnimalPrefab)
+   武器IDセット（攻撃可能パーツ）— DLLから抽出した131件
+   ============================================================ */
+const WEAPON_IDS = new Set([3000,3001,3002,3003,3004,3005,3006,3007,3008,3009,3010,3011,3012,3013,3050,3051,3052,3053,3054,3055,3056,4000,4001,4002,4003,4004,4005,4006,4024,4025,4026,4027,4028,4029,4030,4031,4032,4033,4034,4035,4193,4194,4195,4196,4197,4198,4199,4200,4201,4202,4203,4204,4205,4206,4207,4208,4271,4272,4273,4274,4275,4276,4277,4278,4279,4280,4281,4282,4283,4284,4285,4286,4287,4288,4289,4290,4291,4292,4293,4294,4295,4296,4297,4298,4299,4300,4301,4302,4303,4458,4459,4460,4461,4632,4633,4634,4635,4636,4637,4638,4639,4640,4641,4642,4643,4644,4645,4646]);
+
+/* ============================================================
+   NRBF Parser (subset, with offset tracking for KeyValuePair values)
    ============================================================ */
 class NRBFReader {
   constructor(buf) {
@@ -190,6 +224,7 @@ class NRBFReader {
     this.classMeta = new Map();
     this.libraries = new Map();
     this.rootId = 0;
+    this.fieldOffsets = new Map(); // objectId -> { memberName -> byteOffset }
   }
   u8(){ return this.view.getUint8(this.pos++); }
   i16(){ const v=this.view.getInt16(this.pos,true); this.pos+=2; return v; }
@@ -248,9 +283,13 @@ class NRBFReader {
       default: throw new Error('Unsupported binary type '+bt);
     }
   }
-  readMemberValue(bt, ai){
-    if(bt === 0) return this.readPrimitive(ai);
-    return this.readRecord();
+  readMemberValueWithOffset(bt, ai){
+    if(bt === 0){
+      const offset = this.pos;
+      const value = this.readPrimitive(ai);
+      return { value, offset };
+    }
+    return { value: this.readRecord(), offset: null };
   }
   readRecord(){
     const rt = this.u8();
@@ -286,9 +325,13 @@ class NRBFReader {
     const obj = { _id: oid, _class: className };
     this.objects.set(oid, obj);
     this.classMeta.set(oid, { className, names, bts, ais, libId });
+    const offsets = {};
     for(let i=0;i<mc;i++){
-      obj[names[i]] = this.readMemberValue(bts[i], ais[i]);
+      const r = this.readMemberValueWithOffset(bts[i], ais[i]);
+      obj[names[i]] = r.value;
+      if(r.offset !== null) offsets[names[i]] = r.offset;
     }
+    if(Object.keys(offsets).length) this.fieldOffsets.set(oid, offsets);
     return obj;
   }
   readClassWithId(){
@@ -297,9 +340,13 @@ class NRBFReader {
     if(!meta) throw new Error('Unknown metadataId '+metaId);
     const obj = { _id: oid, _class: meta.className };
     this.objects.set(oid, obj);
+    const offsets = {};
     for(let i=0;i<meta.names.length;i++){
-      obj[meta.names[i]] = this.readMemberValue(meta.bts[i], meta.ais[i]);
+      const r = this.readMemberValueWithOffset(meta.bts[i], meta.ais[i]);
+      obj[meta.names[i]] = r.value;
+      if(r.offset !== null) offsets[meta.names[i]] = r.offset;
     }
+    if(Object.keys(offsets).length) this.fieldOffsets.set(oid, offsets);
     return obj;
   }
   readBinaryObjectString(){
@@ -323,9 +370,7 @@ class NRBFReader {
       const v = this.readRecord();
       if(Array.isArray(v) && v.__nulls){
         for(let k=0;k<v.length && i<len;k++,i++) arr.push(null);
-      } else {
-        arr.push(v); i++;
-      }
+      } else { arr.push(v); i++; }
     }
     return arr;
   }
@@ -363,9 +408,8 @@ class NRBFReader {
     this.objects.set(id, arr);
     let i = 0;
     while(i < total){
-      let v;
-      if(et === 0) { v = this.readPrimitive(ai); arr.push(v); i++; continue; }
-      v = this.readRecord();
+      if(et === 0) { arr.push(this.readPrimitive(ai)); i++; continue; }
+      const v = this.readRecord();
       if(Array.isArray(v) && v.__nulls){
         for(let k=0;k<v.length && i<total;k++,i++) arr.push(null);
       } else { arr.push(v); i++; }
@@ -399,35 +443,40 @@ class NRBFReader {
     for(const k of Object.keys(o)) r[k] = this.resolve(o[k], seen);
     return r;
   }
+  // Get the value offset for a member of a resolved object
+  getValueOffset(resolvedObj, memberName) {
+    // resolvedObj has _id (copied through resolve)
+    if(!resolvedObj || resolvedObj._id === undefined) return null;
+    const map = this.fieldOffsets.get(resolvedObj._id);
+    return map ? map[memberName] : null;
+  }
 }
 
 /* ============================================================
-   Prefab Map (loaded async)
+   Prefab Map
    ============================================================ */
 let PREFAB_MAP = null;
-async function loadMap(){
-  if(PREFAB_MAP) return PREFAB_MAP;
-  try {
-    const res = await fetch('./prefab_map.json');
-    PREFAB_MAP = await res.json();
-  } catch(e){
-    console.error('Failed to load prefab map', e);
-    PREFAB_MAP = {};
+let PREFAB_MAP_PROMISE = null;
+function loadMap(){
+  if(!PREFAB_MAP_PROMISE){
+    PREFAB_MAP_PROMISE = fetch('./prefab_map.json?v=3')
+      .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(m => { PREFAB_MAP = m; return m; })
+      .catch(e => { console.error('Failed to load prefab map', e); PREFAB_MAP_PROMISE = null; PREFAB_MAP = null; return {}; });
   }
-  return PREFAB_MAP;
+  return PREFAB_MAP_PROMISE;
 }
 loadMap();
 
 function lookup(id){
   if(!PREFAB_MAP) return { n: 'ID '+id, c: 'Unknown' };
-  const e = PREFAB_MAP[String(id)];
-  return e || { n: 'unknown('+id+')', c: 'Unknown' };
+  return PREFAB_MAP[String(id)] || { n: 'unknown('+id+')', c: 'UnknownPart' };
 }
 
 /* ============================================================
    Extract WeaponisedAnimalPrefab into analyzed summary
    ============================================================ */
-function analyze(parsed){
+function analyze(parsed, reader){
   if(!parsed || parsed._class !== 'WeaponisedAnimalPrefab'){
     throw new Error('Not a WeaponisedAnimalPrefab (root class: ' + (parsed?._class || 'unknown') + ')');
   }
@@ -436,25 +485,52 @@ function analyze(parsed){
   if(!rec || !rec._class || !rec._class.includes('MapUnitRecord')){
     throw new Error('animalRecord missing or invalid');
   }
-  const props = flatProps(rec.props);
+
+  // Build prop list with offsets
+  // rec.props.KeyValuePairs is array of KeyValuePair objects (resolved)
+  const pairsRaw = rec.props?.KeyValuePairs;
+  if(!Array.isArray(pairsRaw)) throw new Error('props.KeyValuePairs missing');
+
+  // Map: propKey -> { value, offset (for value), pairObj }
+  const propMap = new Map();
+  for(const p of pairsRaw){
+    if(p && p.key !== undefined && p.value !== undefined){
+      const offset = reader.getValueOffset(p, 'value');
+      propMap.set(p.key, { value: p.value, offset, pairObj: p });
+    }
+  }
+
+  const getProp = (k, def) => propMap.has(k) ? propMap.get(k).value : def;
   const baseIdx = rec.unitPrefabIndex;
   const baseInfo = lookup(baseIdx);
-  const hp = (props[2] ?? 100) / 100;
-  const dmg = (props[3] ?? 100) / 100;
-  const scale = (props[4] ?? 100000) / 100000;
-  const ai = props[0] ?? 0;
-  const detect = props[1] ?? 100;
+  const hp = getProp(2, 100) / 100;
+  const dmg = getProp(3, 100) / 100;
+  const scale = getProp(4, 100000) / 100000;
+  const ai = getProp(0, 0);
+  const detect = getProp(1, 100);
   const team = rec.team ?? 0;
 
-  // weapons
+  // weapons: each block of 11 props starting at 100
   const weapons = [];
   let i = 100;
-  while(props[i] !== undefined){
+  while(propMap.has(i)){
+    const wIdx = propMap.get(i).value;
+    const scaleP = propMap.get(i+1);
+    const dmgP   = propMap.get(i+2);
+    const parentP = propMap.get(i+10);
+    const rawDmg = dmgP?.value ?? 0;
+    const dmgFloat = rawDmg / 100000;
     weapons.push({
-      idx: props[i],
-      scale: (props[i+1] ?? 0) / 100000,
-      dmg: (props[i+2] ?? 0) / 100000,
-      parent: props[i+10] ?? 0
+      idx: wIdx,
+      scale: (scaleP?.value ?? 0) / 100000,
+      dmgRaw: rawDmg,                                  // raw int (×100000)
+      dmgOffset: dmgP?.offset ?? null,                 // byte offset to write to
+      dmg: dmgFloat,
+      parent: parentP?.value ?? 0,
+      blockStart: i,
+      // 武器判定: 既知の武器IDリスト OR DMG倍率がデフォルト(1.0)以外
+      // → 「明確に武器」または「ユーザーが意図的にDMGを変えた」パーツを拾う
+      isWeapon: WEAPON_IDS.has(wIdx) || Math.abs(dmgFloat - 1.0) > 0.0001
     });
     i += 11;
   }
@@ -464,185 +540,44 @@ function analyze(parsed){
     const key = w.idx + '|' + w.scale.toFixed(4) + '|' + w.dmg.toFixed(4);
     if(!agg.has(key)){
       const info = lookup(w.idx);
-      agg.set(key, { ...w, count: 0, name: info.n, category: info.c });
+      agg.set(key, {
+        idx: w.idx, scale: w.scale, dmg: w.dmg, dmgRaw: w.dmgRaw,
+        count: 0, instances: [], name: info.n, category: info.c, isWeapon: w.isWeapon
+      });
     }
-    agg.get(key).count++;
+    const g = agg.get(key);
+    g.count++;
+    g.instances.push(w);
   }
-  const list = Array.from(agg.values()).sort((a,b)=>b.count - a.count);
+  const list = Array.from(agg.values()).sort((a,b)=>{
+    if(a.isWeapon !== b.isWeapon) return a.isWeapon ? -1 : 1;
+    return b.count - a.count;
+  });
+  const weaponOnlyCount = weapons.filter(w => w.isWeapon).length;
+  const weaponOnlyKinds = list.filter(g => g.isWeapon).length;
 
   return {
     name, baseIdx, baseInfo,
     hp, dmg, scale, ai, detect, team,
     weaponCount: weapons.length,
     uniqueWeapons: list.length,
+    weaponOnlyCount, weaponOnlyKinds,
     weapons: list
   };
 }
 
-// Convert NRBF Dictionary form into a plain {int: int} object
-function flatProps(propsObj){
-  const out = {};
-  if(!propsObj) return out;
-  const pairs = propsObj.KeyValuePairs;
-  if(!Array.isArray(pairs)) return out;
-  for(const p of pairs){
-    if(p && p.key !== undefined && p.value !== undefined){
-      out[p.key] = p.value;
-    }
-  }
-  return out;
-}
-
 /* ============================================================
-   Rendering
+   Apply edits and produce modified bytes
    ============================================================ */
-const state = { items: [], sort: 'name' };
-
-function render(){
-  const results = document.getElementById('results');
-  const empty = document.getElementById('empty');
-  const tb = document.getElementById('toolbar');
-  results.innerHTML = '';
-
-  if(state.items.length === 0){
-    empty.style.display = '';
-    tb.style.display = 'none';
-    return;
+function applyEdits(originalBytes, edits){
+  // edits: array of { offset, newRawValue (int32) }
+  const copy = new Uint8Array(originalBytes);
+  const view = new DataView(copy.buffer);
+  for(const e of edits){
+    if(e.offset == null) continue;
+    view.setInt32(e.offset, e.newRawValue, true);
   }
-  empty.style.display = 'none';
-  tb.style.display = '';
-
-  const items = [...state.items];
-  if(state.sort === 'weapons') items.sort((a,b)=> (b.summary?.weaponCount ?? -1) - (a.summary?.weaponCount ?? -1));
-  else if(state.sort === 'hp') items.sort((a,b)=> (b.summary?.hp ?? -1) - (a.summary?.hp ?? -1));
-  else if(state.sort === 'dmg') items.sort((a,b)=> (b.summary?.dmg ?? -1) - (a.summary?.dmg ?? -1));
-  else items.sort((a,b)=> (a.summary?.name || a.filename).localeCompare(b.summary?.name || b.filename));
-
-  document.getElementById('count').textContent = state.items.length + ' files loaded';
-
-  for(const it of items){
-    results.appendChild(renderItem(it));
-  }
+  return copy;
 }
 
-function renderItem(it){
-  const div = document.createElement('div');
-  div.className = 'result' + (it.error ? ' error' : '');
-
-  if(it.error){
-    div.innerHTML = '<div class="result-head"><div><div class="label">FILE</div><div class="name">'+escapeHTML(it.filename)+'</div></div><div style="grid-column:2/-1;color:var(--red);font-size:13px">'+escapeHTML(it.error)+'</div></div>';
-    return div;
-  }
-
-  const s = it.summary;
-  const head = document.createElement('div');
-  head.className = 'result-head';
-  head.innerHTML =
-    '<div><div class="label">PREFAB NAME</div><div class="name">'+escapeHTML(s.name || it.filename)+'</div></div>' +
-    '<div><div class="label">BASE UNIT</div><div class="val">'+escapeHTML(s.baseInfo.n)+' <span style="color:var(--text-muted);font-size:11px">#'+s.baseIdx+'</span></div></div>' +
-    '<div><div class="label">HP MULTI</div><div class="val hp">'+fmt(s.hp)+'×</div></div>' +
-    '<div><div class="label">DMG MULTI</div><div class="val dmg">'+fmt(s.dmg)+'×</div></div>' +
-    '<div><div class="label">WEAPONS</div><div class="val weapons">'+s.weaponCount+' <span style="color:var(--text-muted);font-size:11px">('+s.uniqueWeapons+' kinds)</span></div></div>' +
-    '<div class="toggle">▶</div>';
-  head.addEventListener('click', ()=>{
-    div.classList.toggle('open');
-  });
-  div.appendChild(head);
-
-  const body = document.createElement('div');
-  body.className = 'result-body';
-  body.innerHTML =
-    '<div class="meta-row">' +
-      '<span><b>Scale:</b>'+fmt(s.scale)+'×</span>' +
-      '<span><b>AI override:</b>'+s.ai+'</span>' +
-      '<span><b>Detection range:</b>'+s.detect+'m</span>' +
-      '<span><b>Team:</b>'+s.team+'</span>' +
-      '<span><b>File:</b>'+escapeHTML(it.filename)+'</span>' +
-    '</div>';
-
-  if(s.weapons.length === 0){
-    body.innerHTML += '<div style="color:var(--text-muted);padding:12px 0">装着武器なし</div>';
-  } else {
-    let tbl = '<table class="weapons"><thead><tr>' +
-      '<th>Category</th><th>Part Name</th><th class="num">ID</th>' +
-      '<th class="num">Scale</th><th class="num">DMG Multi</th><th class="num">Count</th></tr></thead><tbody>';
-    for(const w of s.weapons){
-      const catClass = w.category.replace(/\s+/g, '');
-      tbl += '<tr>' +
-        '<td><span class="cat '+catClass+'">'+escapeHTML(w.category)+'</span></td>' +
-        '<td>'+escapeHTML(w.name)+'</td>' +
-        '<td class="num">'+w.idx+'</td>' +
-        '<td class="num">'+fmt(w.scale)+'×</td>' +
-        '<td class="num">'+fmt(w.dmg)+'×</td>' +
-        '<td class="num count">×'+w.count+'</td>' +
-        '</tr>';
-    }
-    tbl += '</tbody></table>';
-    body.innerHTML += tbl;
-  }
-  div.appendChild(body);
-  return div;
-}
-
-function fmt(v){
-  if(v === Math.round(v)) return v.toString();
-  return parseFloat(v.toFixed(4)).toString();
-}
-function escapeHTML(s){
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-/* ============================================================
-   File handling
-   ============================================================ */
-async function handleFiles(fileList){
-  await loadMap();
-  for(const f of fileList){
-    if(f.name.toLowerCase().endsWith('.jpg') || f.name.toLowerCase().endsWith('.png')){
-      continue;
-    }
-    const item = { filename: f.name };
-    state.items.push(item);
-    try {
-      const buf = await f.arrayBuffer();
-      const reader = new NRBFReader(buf);
-      const parsed = reader.parse();
-      item.summary = analyze(parsed);
-    } catch(e){
-      item.error = e.message;
-      console.error(f.name, e);
-    }
-  }
-  render();
-}
-
-const drop = document.getElementById('drop');
-const fileInput = document.getElementById('file');
-drop.addEventListener('click', ()=>fileInput.click());
-fileInput.addEventListener('change', e => handleFiles(e.target.files));
-drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
-drop.addEventListener('dragleave', e => drop.classList.remove('dragover'));
-drop.addEventListener('drop', e => {
-  e.preventDefault();
-  drop.classList.remove('dragover');
-  handleFiles(e.dataTransfer.files);
-});
-
-document.getElementById('expandAll').addEventListener('click', ()=>{
-  document.querySelectorAll('.result').forEach(el=>el.classList.add('open'));
-});
-document.getElementById('collapseAll').addEventListener('click', ()=>{
-  document.querySelectorAll('.result').forEach(el=>el.classList.remove('open'));
-});
-document.getElementById('clear').addEventListener('click', ()=>{
-  state.items = []; render();
-});
-document.getElementById('sort').addEventListener('change', e=>{
-  state.sort = e.target.value; render();
-});
-
-render();
-</script>
-
-</body>
-</html>
+/* ==================
