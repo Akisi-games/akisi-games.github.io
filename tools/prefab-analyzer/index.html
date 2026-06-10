@@ -580,4 +580,268 @@ function applyEdits(originalBytes, edits){
   return copy;
 }
 
-/* ==================
+/* ==================   Rendering & State
+   ============================================================ */
+const state = { items: [], sort: 'name', showAll: false };
+
+function render(){
+  const results = document.getElementById('results');
+  const empty = document.getElementById('empty');
+  const tb = document.getElementById('toolbar');
+  results.innerHTML = '';
+
+  if(state.items.length === 0){
+    empty.style.display = '';
+    tb.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  tb.style.display = '';
+
+  const items = [...state.items];
+  if(state.sort === 'weapons') items.sort((a,b)=> (b.summary?.weaponOnlyCount ?? -1) - (a.summary?.weaponOnlyCount ?? -1));
+  else if(state.sort === 'hp') items.sort((a,b)=> (b.summary?.hp ?? -1) - (a.summary?.hp ?? -1));
+  else if(state.sort === 'dmg') items.sort((a,b)=> (b.summary?.dmg ?? -1) - (a.summary?.dmg ?? -1));
+  else items.sort((a,b)=> (a.summary?.name || a.filename).localeCompare(b.summary?.name || b.filename));
+
+  document.getElementById('count').textContent = state.items.length + ' files loaded';
+
+  for(const it of items){
+    results.appendChild(renderItem(it));
+  }
+}
+
+function renderItem(it){
+  const div = document.createElement('div');
+  div.className = 'result' + (it.error ? ' error' : '') + (it.modified ? ' modified' : '');
+  div.setAttribute('data-result-id', it.id);
+
+  if(it.error){
+    div.innerHTML = '<div class="result-head"><div><div class="label">FILE</div><div class="name">'+escapeHTML(it.filename)+'</div></div><div style="grid-column:2/-1;color:var(--red);font-size:13px">'+escapeHTML(it.error)+'</div></div>';
+    return div;
+  }
+
+  const s = it.summary;
+  const head = document.createElement('div');
+  head.className = 'result-head';
+  const modFlag = it.modified ? '<span class="mod-flag">MODIFIED</span>' : '';
+  head.innerHTML =
+    '<div><div class="label">PREFAB NAME</div><div class="name">'+escapeHTML(s.name || it.filename)+modFlag+'</div></div>' +
+    '<div><div class="label">BASE UNIT</div><div class="val">'+escapeHTML(s.baseInfo.n)+' <span style="color:var(--text-muted);font-size:11px">#'+s.baseIdx+'</span></div></div>' +
+    '<div><div class="label">HP MULTI</div><div class="val hp">'+fmt(s.hp)+'×</div></div>' +
+    '<div><div class="label">DMG MULTI</div><div class="val dmg">'+fmt(s.dmg)+'×</div></div>' +
+    '<div><div class="label">WEAPONS</div><div class="val weapons">'+s.weaponOnlyCount+' <span style="color:var(--text-muted);font-size:11px">/ all '+s.weaponCount+'</span></div></div>' +
+    '<div class="toggle">▶</div>';
+  head.addEventListener('click', ()=>{ div.classList.toggle('open'); });
+  div.appendChild(head);
+
+  const body = document.createElement('div');
+  body.className = 'result-body';
+  body.innerHTML =
+    '<div class="meta-row">' +
+      '<span><b>Scale:</b>'+fmt(s.scale)+'×</span>' +
+      '<span><b>AI override:</b>'+s.ai+'</span>' +
+      '<span><b>Detection range:</b>'+s.detect+'m</span>' +
+      '<span><b>Team:</b>'+s.team+'</span>' +
+      '<span><b>File:</b>'+escapeHTML(it.filename)+'</span>' +
+    '</div>';
+
+  const bodyTb = document.createElement('div');
+  bodyTb.className = 'body-toolbar';
+  bodyTb.innerHTML =
+    '<span class="quick-set">武器全体に一括 DMG倍率: <input type="number" class="quick-input" step="0.1" placeholder="例: 5" id="qi-'+it.id+'"/></span>' +
+    '<button data-action="apply-quick">一括適用</button>' +
+    '<button data-action="reset">リセット</button>' +
+    '<span class="info" id="info-'+it.id+'">変更なし</span>' +
+    '<button class="primary" data-action="download" id="dl-'+it.id+'" disabled>変更ファイルをダウンロード</button>';
+  body.appendChild(bodyTb);
+
+  const weaponsToShow = state.showAll ? s.weapons : s.weapons.filter(w => w.isWeapon);
+
+  if(weaponsToShow.length === 0){
+    const msg = document.createElement('div');
+    msg.style.cssText = 'color:var(--text-muted);padding:12px 0';
+    msg.textContent = state.showAll ? '装着パーツなし' : '攻撃可能な武器なし（装飾パーツのみ）';
+    body.appendChild(msg);
+  } else {
+    const tbl = document.createElement('table');
+    tbl.className = 'weapons';
+    tbl.innerHTML =
+      '<thead><tr>' +
+      '<th>Category</th><th>Part Name</th><th class="num">ID</th>' +
+      '<th class="num">Scale</th><th class="num">DMG倍率（編集可）</th><th class="num">Count</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    weaponsToShow.forEach(w => {
+      const tr = document.createElement('tr');
+      if(!w.isWeapon) tr.className = 'non-weapon';
+      const catClass = w.category.replace(/\s+/g, '');
+      tr.innerHTML =
+        '<td><span class="cat '+catClass+'">'+escapeHTML(w.category)+'</span></td>' +
+        '<td>'+escapeHTML(w.name)+'</td>' +
+        '<td class="num">'+w.idx+'</td>' +
+        '<td class="num">'+fmt(w.scale)+'×</td>' +
+        '<td class="num"></td>' +
+        '<td class="num count">×'+w.count+'</td>';
+      const dmgCell = tr.children[4];
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.step = '0.1';
+      input.className = 'dmg-input';
+      input.value = fmt(w.dmg);
+      input.dataset.itemId = it.id;
+      input.dataset.groupIdx = String(s.weapons.indexOf(w));
+      input.disabled = !w.isWeapon;
+      input.addEventListener('input', onDmgInput);
+      dmgCell.appendChild(input);
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    body.appendChild(tbl);
+  }
+
+  bodyTb.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const action = btn.dataset.action;
+    if(action === 'apply-quick'){
+      const qi = document.getElementById('qi-'+it.id);
+      const v = parseFloat(qi.value);
+      if(!isFinite(v) || v < 0){ alert('正しい数値を入力してください'); return; }
+      const inputs = body.querySelectorAll('.dmg-input:not(:disabled)');
+      inputs.forEach(inp => {
+        inp.value = fmt(v);
+        onDmgInput({ target: inp });
+      });
+    } else if(action === 'reset'){
+      it.edits = new Map();
+      it.modified = false;
+      render();
+    } else if(action === 'download'){
+      downloadModified(it);
+    }
+  });
+
+  div.appendChild(body);
+  return div;
+}
+
+function onDmgInput(e){
+  const inp = e.target;
+  const itemId = inp.dataset.itemId;
+  const gIdx = parseInt(inp.dataset.groupIdx, 10);
+  const item = state.items.find(x => x.id === itemId);
+  if(!item) return;
+  const group = item.summary.weapons[gIdx];
+  if(!group) return;
+
+  const newDmg = parseFloat(inp.value);
+  if(!isFinite(newDmg) || newDmg < 0){ inp.classList.add('changed'); return; }
+  const newRaw = Math.round(newDmg * 100000);
+  const isChanged = newRaw !== group.dmgRaw;
+  inp.classList.toggle('changed', isChanged);
+
+  if(!item.edits) item.edits = new Map();
+  if(isChanged){
+    for(const inst of group.instances){
+      item.edits.set(inst.blockStart + 2, { offset: inst.dmgOffset, newRawValue: newRaw });
+    }
+  } else {
+    for(const inst of group.instances){
+      item.edits.delete(inst.blockStart + 2);
+    }
+  }
+  const wasModified = item.modified;
+  item.modified = item.edits.size > 0;
+  const dl = document.getElementById('dl-'+item.id);
+  const info = document.getElementById('info-'+item.id);
+  if(dl) dl.disabled = !item.modified;
+  if(info) info.textContent = item.modified ? (item.edits.size + ' 武器を変更') : '変更なし';
+  if(wasModified !== item.modified){
+    const result = document.querySelector('[data-result-id="'+item.id+'"]');
+    if(result) result.classList.toggle('modified', item.modified);
+  }
+}
+
+function downloadModified(item){
+  if(!item.modified || !item.edits || item.edits.size === 0) return;
+  const edits = Array.from(item.edits.values());
+  const modified = applyEdits(item.originalBytes, edits);
+  const blob = new Blob([modified], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = item.filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=> URL.revokeObjectURL(url), 1000);
+}
+
+function fmt(v){
+  if(v === Math.round(v)) return v.toString();
+  return parseFloat(v.toFixed(4)).toString();
+}
+function escapeHTML(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ============================================================
+   File handling
+   ============================================================ */
+let nextItemId = 1;
+async function handleFiles(fileList){
+  await loadMap();
+  for(const f of fileList){
+    if(f.name.toLowerCase().endsWith('.jpg') || f.name.toLowerCase().endsWith('.png')){
+      continue;
+    }
+    const id = 'it'+(nextItemId++);
+    const item = { id, filename: f.name, edits: new Map(), modified: false };
+    state.items.push(item);
+    try {
+      const buf = await f.arrayBuffer();
+      item.originalBytes = new Uint8Array(buf).slice();
+      const reader = new NRBFReader(buf);
+      const parsed = reader.parse();
+      item.summary = analyze(parsed, reader);
+    } catch(e){
+      item.error = e.message;
+      console.error(f.name, e);
+    }
+  }
+  render();
+}
+
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+drop.addEventListener('click', ()=>fileInput.click());
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
+drop.addEventListener('dragleave', e => drop.classList.remove('dragover'));
+drop.addEventListener('drop', e => {
+  e.preventDefault();
+  drop.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+
+document.getElementById('expandAll').addEventListener('click', ()=>{
+  document.querySelectorAll('.result').forEach(el=>el.classList.add('open'));
+});
+document.getElementById('collapseAll').addEventListener('click', ()=>{
+  document.querySelectorAll('.result').forEach(el=>el.classList.remove('open'));
+});
+document.getElementById('clear').addEventListener('click', ()=>{
+  state.items = []; render();
+});
+document.getElementById('sort').addEventListener('change', e=>{
+  state.sort = e.target.value; render();
+});
+document.getElementById('showAll').addEventListener('change', e=>{
+  state.showAll = e.target.checked; render();
+});
+
+render();
+</script>
+
+</body>
+</html>
