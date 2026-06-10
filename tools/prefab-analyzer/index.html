@@ -229,9 +229,50 @@ footer { padding: 32px; text-align: center; color: var(--text-muted); font-size:
 
 <script>
 /* ============================================================
-   武器IDセット（攻撃可能パーツ）— DLLから抽出した131件
+   武器ID＆正式名マップ（ユーザー提供：ARBSメニュー121件）
    ============================================================ */
-const WEAPON_IDS = new Set([3000,3001,3002,3003,3004,3005,3006,3007,3008,3009,3010,3011,3012,3013,3050,3051,3052,3053,3054,3055,3056,4000,4001,4002,4003,4004,4005,4006,4024,4025,4026,4027,4028,4029,4030,4031,4032,4033,4034,4035,4193,4194,4195,4196,4197,4198,4199,4200,4201,4202,4203,4204,4205,4206,4207,4208,4271,4272,4273,4274,4275,4276,4277,4278,4279,4280,4281,4282,4283,4284,4285,4286,4287,4288,4289,4290,4291,4292,4293,4294,4295,4296,4297,4298,4299,4300,4301,4302,4303,4458,4459,4460,4461,4632,4633,4634,4635,4636,4637,4638,4639,4640,4641,4642,4643,4644,4645,4646]);
+const WEAPON_NAMES_JA = {
+  4000:"ピアサー",4001:"ダイナマイト",4002:"マシンガン",4003:"ミサイルランチャー",
+  4004:"鋼の触手",4005:"もり",4006:"スパイク(スピア)",
+  4024:"触手(茶)",4025:"触手(黄)",4026:"触手(赤)",4027:"触手(青)",
+  4028:"ボーンスパイク(短白)",4029:"ボーンスパイク(短赤)",4030:"ボーンスパイク(長白)",4031:"ボーンスパイク(長赤)",
+  4032:"ボーンスパイク(短白曲)",4033:"ボーンスパイク(短赤曲)",4034:"ボーンスパイク(長白曲)",4035:"ボーンスパイク(長赤曲)",
+  4036:"パンチャー(人1右)",4037:"パンチャー(溶岩右)",4038:"パンチャー(ゴリラ右)",4039:"パンチャー(スケルトン右)",
+  4058:"パンチャー(人1左)",4059:"パンチャー(溶岩左)",4060:"パンチャー(ゴリラ左)",4061:"パンチャー(スケルトン左)",
+  4062:"ソードハンド(人1右)",4063:"ソードハンド(人1左)",4064:"ソードハンド(溶岩右)",4065:"ソードハンド(溶岩左)",
+  4066:"ソードハンド(ゴリラ右)",4067:"ソードハンド(ゴリラ左)",4068:"ソードハンド(スケルトン右)",4069:"ソードハンド(スケルトン左)",
+  4070:"ハンマーハンド(人1右)",4071:"ハンマーハンド(人1左)",4072:"ハンマーハンド(溶岩右)",4073:"ハンマーハンド(溶岩左)",
+  4074:"ハンマーハンド(ゴリラ右)",4075:"ハンマーハンド(ゴリラ左)",4076:"ハンマーハンド(スケルトン右)",4077:"ハンマーハンド(スケルトン左)",
+  4078:"槍の手(人1右)",4079:"槍の手(人1左)",4080:"槍の手(溶岩右)",4081:"槍の手(溶岩左)",
+  4082:"槍の手(ゴリラ右)",4083:"槍の手(ゴリラ左)",4084:"槍の手(スケルトン右)",4085:"槍の手(スケルトン左)",
+  4089:"バリスタ",4192:"ボクシンググローブ",
+  4198:"スパイク(丸黒)",4199:"スパイク(丸金)",4200:"スパイク(丸銀)",
+  4201:"スパイク(角黒)",4202:"スパイク(角金)",4203:"スパイク(角銀)",
+  4204:"ブレード(黒短)",4205:"ブレード(金短)",4206:"ブレード(銀短)",
+  4207:"ブレード(赤短)",4208:"ブレード(青短)",4209:"ブレード(緑短)",
+  4210:"ブレード(黒短曲)",4211:"ブレード(金短曲)",4212:"ブレード(銀短曲)",
+  4213:"ブレード(赤短曲)",4214:"ブレード(青短曲)",4215:"ブレード(緑短曲)",
+  4216:"ブレード(黒長曲)",4217:"ブレード(金長曲)",4218:"ブレード(銀長曲)",
+  4219:"ブレード(赤長曲)",4220:"ブレード(青長曲)",4221:"ブレード(緑長曲)",
+  4230:"パンチャー(人2右)",4231:"パンチャー(人2左)",
+  4232:"ソードハンド(人2右)",4233:"ソードハンド(人2左)",
+  4234:"ハンマーハンド(人2右)",4235:"ハンマーハンド(人2左)",
+  4236:"槍の手(人2右)",4237:"槍の手(人2左)",
+  4257:"爪(ティラノ左腕)",4258:"爪(ティラノ右腕)",
+  4259:"爪(スピノ左腕)",4260:"爪(スピノ右腕)",
+  4261:"爪(アロ左腕)",4262:"爪(アロ右腕)",
+  4263:"爪(クリロフォ左腕)",4264:"爪(クリロフォ右腕)",
+  4265:"爪(テリジノ左腕)",4266:"爪(テリジノ右腕)",
+  4280:"ライトニングガン",
+  4281:"プラズマキャノン(青)",4282:"プラズマキャノン(赤)",4283:"プラズマキャノン(黄)",4284:"プラズマキャノン(紫)",4285:"プラズマキャノン(緑)",
+  4286:"プラズマビーム・T-Rex(青)",4287:"プラズマビーム・T-Rex(赤)",4288:"プラズマビーム・T-Rex(黄)",4289:"プラズマビーム・T-Rex(紫)",4290:"プラズマビーム・T-Rex(緑)",
+  4343:"ロケットランチャー",4354:"火炎放射器(武器2)",
+  4631:"B.O.S.S-ロケット発射台",4632:"B.O.S.S-機関銃",
+  4636:"S.P.I.D.E.R-サンダーボルト",4637:"S.P.I.D.E.R-カミカゼドローン",4638:"S.P.I.D.E.R-プラズマフィールド",
+  4639:"焼夷ロケット",4640:"レールガン",4641:"プラズマキャノン(武器3)",4642:"グランドミサイル",
+  4643:"火炎放射器(武器3)",4644:"対空ミサイル",4645:"イオンシールド",4646:"自動砲塔"
+};
+const WEAPON_IDS = new Set(Object.keys(WEAPON_NAMES_JA).map(k => parseInt(k, 10)));
 
 /* ============================================================
    NRBF Parser (subset, with offset tracking for KeyValuePair values)
@@ -501,6 +542,11 @@ loadMap();
 
 function lookup(id){
   const sid = String(id);
+  // 1. WEAPON_NAMES_JA を最優先（ユーザー提供の正式名）
+  if(WEAPON_NAMES_JA[id]){
+    const entry = PREFAB_MAP ? PREFAB_MAP[sid] : null;
+    return { n: WEAPON_NAMES_JA[id], en: entry?.n || null, c: entry?.c || 'Unit Creator' };
+  }
   if(!PREFAB_MAP) return { n: 'ID '+id, c: 'Unknown', en: null };
   const entry = PREFAB_MAP[sid];
   if(!entry) return { n: 'unknown('+id+')', c: 'UnknownPart', en: null };
@@ -571,7 +617,9 @@ function analyze(parsed, reader){
       parent: parentP?.value ?? 0,
       blockStart: i,
       keyOffsets,                                     // 11個の key の byte offset
-      isWeapon: WEAPON_IDS.has(wIdx) || Math.abs(dmgFloat - 1.0) > 0.0001
+      // 武器判定: WEAPON_NAMES_JA に登録されたIDのみ表示
+      // → フィラーウェポン、装飾、未知パーツは自動的に非表示
+      isWeapon: WEAPON_IDS.has(wIdx)
     });
     i += 11;
   }
@@ -723,12 +771,18 @@ function renderItem(it){
 
   const bodyTb = document.createElement('div');
   bodyTb.className = 'body-toolbar';
+  const dlDisabled = it.modified ? '' : 'disabled';
+  const infoText = it.modified
+    ? ((it.edits && it.edits.size ? it.edits.size + ' 武器の倍率変更' : '') +
+       (it.edits && it.edits.size && it.deleted && it.deleted.size ? ' / ' : '') +
+       (it.deleted && it.deleted.size ? it.deleted.size + ' 武器を削除' : ''))
+    : '変更なし';
   bodyTb.innerHTML =
     '<span class="quick-set">武器全体に一括 DMG倍率: <input type="number" class="quick-input" step="0.1" placeholder="例: 5" id="qi-'+it.id+'"/></span>' +
-    '<button data-action="apply-quick">一括適用</button>' +
-    '<button data-action="reset">リセット</button>' +
-    '<span class="info" id="info-'+it.id+'">変更なし</span>' +
-    '<button class="primary" data-action="download" id="dl-'+it.id+'" disabled>変更ファイルをダウンロード</button>';
+    '<button type="button" data-action="apply-quick">一括適用</button>' +
+    '<button type="button" data-action="reset">リセット</button>' +
+    '<span class="info" id="info-'+it.id+'">'+infoText+'</span>' +
+    '<button type="button" class="primary" data-action="download" id="dl-'+it.id+'" '+dlDisabled+'>変更ファイルをダウンロード</button>';
   body.appendChild(bodyTb);
 
   const weaponsToShow = state.showAll ? s.weapons : s.weapons.filter(w => w.isWeapon);
@@ -778,6 +832,7 @@ function renderItem(it){
       // 削除/復元ボタン
       const delCell = tr.children[6];
       const delBtn = document.createElement('button');
+      delBtn.type = 'button';
       delBtn.className = 'del-btn' + (allDeleted ? ' undo' : '');
       delBtn.textContent = allDeleted ? '復元' : '削除';
       delBtn.dataset.itemId = it.id;
@@ -846,7 +901,9 @@ function onDmgInput(e){
 }
 
 function onDeleteToggle(e){
-  const btn = e.target;
+  e.preventDefault();
+  e.stopPropagation();
+  const btn = e.currentTarget;
   const itemId = btn.dataset.itemId;
   const gIdx = parseInt(btn.dataset.groupIdx, 10);
   const item = state.items.find(x => x.id === itemId);
@@ -861,7 +918,17 @@ function onDeleteToggle(e){
     for(const inst of group.instances) item.deleted.add(inst.blockStart);
   }
   updateModifiedState(item);
+  // 該当パネルが open のままになるよう保存して render() → 再展開
+  const openIds = new Set();
+  document.querySelectorAll('.result.open').forEach(el => openIds.add(el.getAttribute('data-result-id')));
+  const scrollY = window.scrollY;
   render();
+  document.querySelectorAll('.result').forEach(el => {
+    if(openIds.has(el.getAttribute('data-result-id'))){
+      el.classList.add('open');
+    }
+  });
+  window.scrollTo(0, scrollY);
 }
 
 function updateModifiedState(item){
