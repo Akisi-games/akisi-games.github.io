@@ -801,18 +801,18 @@ function analyze(parsed, reader){
   const weaponOnlyKinds = list.filter(g => g.isWeapon).length;
 
   // props辞書のメタ情報（新規prop追加用）
+  // 新規 objectId は「既存IDの最小値 - 1」から始める（負方向に拡張）
+  // → BinaryFormatter の内部 ID 連番予測と衝突しない安全な範囲
+  let minId = 0;
+  for(const p of pairsRaw){
+    if(p && p._id !== undefined && p._id < minId) minId = p._id;
+  }
   const pairsMeta = {
     lengthOffset: pairsRaw.__lengthOffset,
     endOffset: pairsRaw.__endOffset,
-    metadataId: pairsRaw[0]?._id,    // 最初の KeyValuePair の objectId（=class metadata ID）
-    nextNewId: 8                       // 新しい objectId として使う値（重複しない範囲）
+    metadataId: pairsRaw[0]?._id,
+    nextNewId: minId - 1   // -1487 のような未使用領域から開始
   };
-  // 既存の objectId の最大値を確認（重複しないよう）
-  for(const p of pairsRaw){
-    if(p && p._id !== undefined && p._id > pairsMeta.nextNewId){
-      pairsMeta.nextNewId = p._id + 1;
-    }
-  }
 
   return {
     name, baseIdx, baseInfo,
@@ -1493,3 +1493,4 @@ render();
 
 </body>
 </html>
+state.showAll = e.ta
