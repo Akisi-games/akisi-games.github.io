@@ -57,13 +57,7 @@ h1 { margin: 0 0 8px 0; font-size: 40px; letter-spacing: 2px; }
 }
 .drop .big { font-size: 24px; font-weight: 900; margin-bottom: 8px; }
 .drop .small { color: var(--text-soft); font-size: 13px; }
-.drop input[type="file"] {
-  position: absolute;
-  left: -9999px;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-}
+.drop input[type="file"] { display: none; }
 
 .toolbar {
   display: flex; gap: 16px; margin: 32px 0 16px; flex-wrap: wrap; align-items: center;
@@ -152,6 +146,9 @@ h1 { margin: 0 0 8px 0; font-size: 40px; letter-spacing: 2px; }
 .base-edit-field-small { position: relative; }
 .base-edit-field-small input { padding-right: 24px; text-align: right; font-variant-numeric: tabular-nums; }
 .base-edit-field-small .suffix { position: absolute; right: 10px; bottom: 7px; color: var(--text-muted); font-size: 13px; pointer-events: none; }
+.base-checkbox { display: inline-flex; align-items: center; gap: 8px; color: var(--text-soft); font-size: 13px; cursor: pointer; padding: 4px 0; }
+.base-checkbox input[type="checkbox"] { accent-color: var(--cyan); width: 16px; height: 16px; cursor: pointer; }
+.base-checkbox span { user-select: none; }
 
 .body-toolbar { display: flex; gap: 12px; align-items: center; margin: 16px 0 8px; flex-wrap: wrap; }
 .body-toolbar .info { color: var(--text-soft); font-size: 12px; }
@@ -944,6 +941,8 @@ function renderItem(it){
   const curName = it.newPrefabName !== undefined ? it.newPrefabName : s.name;
   const curHp = it.newHpRaw !== undefined ? (it.newHpRaw / 100) : s.hp;
   const curDmg = it.newDmgRaw !== undefined ? (it.newDmgRaw / 100) : s.dmg;
+  const cur4W = it.newHide4W ?? false;
+  const curSk = it.newHideSkel ?? false;
   body.innerHTML =
     '<div class="base-edit">' +
       '<div class="base-edit-row">' +
@@ -955,6 +954,12 @@ function renderItem(it){
         '<input type="number" step="0.1" min="0" class="base-hp-input" data-item-id="'+it.id+'" value="'+fmt(curHp)+'"/><span class="suffix">×</span></label>' +
         '<label class="base-edit-field-small"><span>ベース攻撃倍率</span>' +
         '<input type="number" step="0.1" min="0" class="base-dmg-input" data-item-id="'+it.id+'" value="'+fmt(curDmg)+'"/><span class="suffix">×</span></label>' +
+      '</div>' +
+      '<div class="base-edit-row">' +
+        '<label class="base-checkbox"><input type="checkbox" class="base-hide4w-input" data-item-id="'+it.id+'" '+(cur4W?'checked':'')+'/>'+
+        '<span>ベース「4Wheeler（車両ベース）」を非表示にする</span></label>' +
+        '<label class="base-checkbox"><input type="checkbox" class="base-hideskel-input" data-item-id="'+it.id+'" '+(curSk?'checked':'')+'/>'+
+        '<span>ベース「Skeleton（人型ベース）」を非表示にする</span></label>' +
       '</div>' +
     '</div>' +
     '<div class="meta-row">' +
@@ -972,6 +977,10 @@ function renderItem(it){
     if(he) he.addEventListener('input', onBaseHpInput);
     const de = body.querySelector('.base-dmg-input');
     if(de) de.addEventListener('input', onBaseDmgInput);
+    const wf = body.querySelector('.base-hide4w-input');
+    if(wf) wf.addEventListener('change', onBaseHide4WInput);
+    const sk = body.querySelector('.base-hideskel-input');
+    if(sk) sk.addEventListener('change', onBaseHideSkelInput);
   }, 0);
 
   const bodyTb = document.createElement('div');
@@ -1084,6 +1093,8 @@ function renderItem(it){
       delete it.newPrefabName;
       delete it.newHpRaw;
       delete it.newDmgRaw;
+      delete it.newHide4W;
+      delete it.newHideSkel;
       it.modified = false;
       render();
     } else if(action === 'download'){
@@ -1172,6 +1183,22 @@ function onBaseDmgInput(e){
   updateModifiedState(item);
 }
 
+function onBaseHide4WInput(e){
+  const item = state.items.find(x => x.id === e.target.dataset.itemId);
+  if(!item) return;
+  if(e.target.checked) item.newHide4W = true;
+  else delete item.newHide4W;
+  updateModifiedState(item);
+}
+
+function onBaseHideSkelInput(e){
+  const item = state.items.find(x => x.id === e.target.dataset.itemId);
+  if(!item) return;
+  if(e.target.checked) item.newHideSkel = true;
+  else delete item.newHideSkel;
+  updateModifiedState(item);
+}
+
 function onVisibilityToggle(e){
   e.preventDefault();
   e.stopPropagation();
@@ -1235,7 +1262,8 @@ function updateModifiedState(item){
   const hasNameChange = item.newPrefabName !== undefined;
   const hasHpChange = item.newHpRaw !== undefined;
   const hasDmgChange = item.newDmgRaw !== undefined;
-  item.modified = hasEdits || hasDeletions || hasHidden || hasNameChange || hasHpChange || hasDmgChange;
+  const hasBaseHide = item.newHide4W !== undefined || item.newHideSkel !== undefined;
+  item.modified = hasEdits || hasDeletions || hasHidden || hasNameChange || hasHpChange || hasDmgChange || hasBaseHide;
   const result = document.querySelector('[data-result-id="'+item.id+'"]');
   if(result) result.classList.toggle('modified', item.modified);
   const dl = document.getElementById('dl-'+item.id);
@@ -1246,6 +1274,8 @@ function updateModifiedState(item){
     if(item.newPrefabName !== undefined) parts.push('名前変更');
     if(item.newHpRaw !== undefined) parts.push('HP変更');
     if(item.newDmgRaw !== undefined) parts.push('攻撃倍率変更');
+    if(item.newHide4W) parts.push('4W非表示');
+    if(item.newHideSkel) parts.push('Skel非表示');
     if(item.edits && item.edits.size) parts.push(item.edits.size + ' 武器の倍率変更');
     if(item.deleted && item.deleted.size) parts.push(item.deleted.size + ' 武器を削除');
     if(item.hidden && item.hidden.size) parts.push(item.hidden.size + ' 武器を非表示');
@@ -1277,29 +1307,39 @@ function downloadModified(item){
   }
   let modified = applyEdits(item.originalBytes, [...rearrangeEdits, ...dmgEdits, ...baseEdits]);
 
-  // 非表示武器を props に書き込む（NRBF配列に新規エントリ追加）
-  if(item.hidden && item.hidden.size > 0 && item.summary.pairsMeta){
-    const hiddenIndices = [];
-    let newIndex = 0;
-    for(const block of allBlocks){
-      if(deletedSet.has(block.blockStart)) continue;
-      if(item.hidden.has(block.blockStart)){
-        hiddenIndices.push(newIndex);
+  // 新規 prop 追加（非表示武器・ベース非表示） — endOffを共有して使う
+  if(item.summary.pairsMeta && (
+      (item.hidden && item.hidden.size > 0) || item.newHide4W || item.newHideSkel)){
+    const meta = item.summary.pairsMeta;
+    let endOff = meta.endOffset;
+    let newId = meta.nextNewId;
+    // 非表示武器
+    if(item.hidden && item.hidden.size > 0){
+      const hiddenIndices = [];
+      let newIndex = 0;
+      for(const block of allBlocks){
+        if(deletedSet.has(block.blockStart)) continue;
+        if(item.hidden.has(block.blockStart)) hiddenIndices.push(newIndex);
+        newIndex++;
       }
-      newIndex++;
+      if(hiddenIndices.length > 0){
+        const r1 = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId++, 5, hiddenIndices.length);
+        modified = r1.bytes; endOff = r1.newEndOffset;
+        for(let i = 0; i < hiddenIndices.length; i++){
+          const r = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId++, 6 + i, hiddenIndices[i]);
+          modified = r.bytes; endOff = r.newEndOffset;
+        }
+      }
     }
-    if(hiddenIndices.length > 0){
-      const meta = item.summary.pairsMeta;
-      let endOff = meta.endOffset;
-      let newId = meta.nextNewId;
-      const r1 = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId++, 5, hiddenIndices.length);
-      modified = r1.bytes;
-      endOff = r1.newEndOffset;
-      for(let i = 0; i < hiddenIndices.length; i++){
-        const r = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId++, 6 + i, hiddenIndices[i]);
-        modified = r.bytes;
-        endOff = r.newEndOffset;
-      }
+    // ベース 4Wheeler 非表示
+    if(item.newHide4W){
+      const r = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId++, 7, 1);
+      modified = r.bytes; endOff = r.newEndOffset;
+    }
+    // ベース Skeleton 非表示
+    if(item.newHideSkel){
+      const r = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId++, 8, 1);
+      modified = r.bytes; endOff = r.newEndOffset;
     }
   }
 
@@ -1418,16 +1458,38 @@ drop.addEventListener('click', e => {
   fileInput.click();
 });
 fileInput.addEventListener('change', e => handleFiles(e.target.files));
-drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
-drop.addEventListener('dragleave', e => drop.classList.remove('dragover'));
+drop.addEventListener('dragenter', e => { e.preventDefault(); e.stopPropagation(); drop.classList.add('dragover'); });
+drop.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); drop.classList.add('dragover'); });
+drop.addEventListener('dragleave', e => { e.preventDefault(); e.stopPropagation(); drop.classList.remove('dragover'); });
 drop.addEventListener('drop', e => {
   e.preventDefault();
+  e.stopPropagation();
   drop.classList.remove('dragover');
-  handleFiles(e.dataTransfer.files);
+  if(e.dataTransfer && e.dataTransfer.files){
+    handleFiles(e.dataTransfer.files);
+  }
 });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
 
 document.getElementById('expandAll').addEventListener('click', ()=>{
   document.querySelectorAll('.result').forEach(el=>el.classList.add('open'));
 });
 document.getElementById('collapseAll').addEventListener('click', ()=>{
-  document.querySelectorAll('.result').forEach(el=>el.classList.remove('open
+  document.querySelectorAll('.result').forEach(el=>el.classList.remove('open'));
+});
+document.getElementById('clear').addEventListener('click', ()=>{
+  state.items = []; render();
+});
+document.getElementById('sort').addEventListener('change', e=>{
+  state.sort = e.target.value; render();
+});
+document.getElementById('showAll').addEventListener('change', e=>{
+  state.showAll = e.target.checked; render();
+});
+
+render();
+</script>
+
+</body>
+</html>
