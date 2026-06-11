@@ -175,7 +175,12 @@
     user-select: none;
   }
   /* glitch layers */
-  .glitch { position: relative; display: inline-block; }
+  .glitch {
+    position: relative; display: inline-block;
+    background: var(--grad-hero);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
   .glitch::before, .glitch::after {
     content: attr(data-text);
     position: absolute; inset: 0;
