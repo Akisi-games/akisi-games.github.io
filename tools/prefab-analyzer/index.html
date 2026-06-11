@@ -1323,22 +1323,24 @@ function downloadModified(item){
         newIndex++;
       }
       if(hiddenIndices.length > 0){
-        const r1 = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId++, 5, hiddenIndices.length);
+        // 武器ブロック(100..)・ARBS基本設定(0..4) と絶対被らない領域を使う
+        // key=10000: hidden 武器数、key=10001+: hidden 武器インデックス
+        const r1 = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId--, 10000, hiddenIndices.length);
         modified = r1.bytes; endOff = r1.newEndOffset;
         for(let i = 0; i < hiddenIndices.length; i++){
-          const r = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId++, 6 + i, hiddenIndices[i]);
+          const r = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId--, 10001 + i, hiddenIndices[i]);
           modified = r.bytes; endOff = r.newEndOffset;
         }
       }
     }
-    // ベース 4Wheeler 非表示
+    // ベース 4Wheeler 非表示 (key=20000)
     if(item.newHide4W){
-      const r = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId++, 7, 1);
+      const r = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId--, 20000, 1);
       modified = r.bytes; endOff = r.newEndOffset;
     }
-    // ベース Skeleton 非表示
+    // ベース Skeleton 非表示 (key=20001)
     if(item.newHideSkel){
-      const r = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId++, 8, 1);
+      const r = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId--, 20001, 1);
       modified = r.bytes; endOff = r.newEndOffset;
     }
   }
@@ -1493,4 +1495,3 @@ render();
 
 </body>
 </html>
-state.showAll = e.ta
