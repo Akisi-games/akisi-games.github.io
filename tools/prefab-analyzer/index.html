@@ -199,16 +199,6 @@ table.weapons .del-btn:hover { background: var(--red); color: #000; }
 table.weapons .del-btn.undo { color: var(--cyan); border-color: var(--cyan); }
 table.weapons .del-btn.undo:hover { background: var(--cyan); color: #000; }
 table.weapons .part-name-en { color: var(--text-muted); font-size: 11px; margin-left: 6px; }
-table.weapons .visibility-toggle {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: transparent; color: var(--green); border: 1px solid var(--green);
-  border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;
-  font-weight: 700;
-}
-table.weapons .visibility-toggle:hover { background: var(--green); color: #000; }
-table.weapons .visibility-toggle.hidden { color: var(--pink); border-color: var(--pink); }
-table.weapons .visibility-toggle.hidden:hover { background: var(--pink); color: #000; }
-table.weapons tr.hidden-weapon td:not(:last-child) { opacity: 0.5; }
 
 .error-msg { padding: 24px; color: var(--red); font-size: 14px; }
 
@@ -941,8 +931,6 @@ function renderItem(it){
   const curName = it.newPrefabName !== undefined ? it.newPrefabName : s.name;
   const curHp = it.newHpRaw !== undefined ? (it.newHpRaw / 100) : s.hp;
   const curDmg = it.newDmgRaw !== undefined ? (it.newDmgRaw / 100) : s.dmg;
-  const cur4W = it.newHide4W ?? false;
-  const curSk = it.newHideSkel ?? false;
   body.innerHTML =
     '<div class="base-edit">' +
       '<div class="base-edit-row">' +
@@ -954,12 +942,6 @@ function renderItem(it){
         '<input type="number" step="0.1" min="0" class="base-hp-input" data-item-id="'+it.id+'" value="'+fmt(curHp)+'"/><span class="suffix">×</span></label>' +
         '<label class="base-edit-field-small"><span>ベース攻撃倍率</span>' +
         '<input type="number" step="0.1" min="0" class="base-dmg-input" data-item-id="'+it.id+'" value="'+fmt(curDmg)+'"/><span class="suffix">×</span></label>' +
-      '</div>' +
-      '<div class="base-edit-row">' +
-        '<label class="base-checkbox"><input type="checkbox" class="base-hide4w-input" data-item-id="'+it.id+'" '+(cur4W?'checked':'')+'/>'+
-        '<span>ベース「4Wheeler（車両ベース）」を非表示にする</span></label>' +
-        '<label class="base-checkbox"><input type="checkbox" class="base-hideskel-input" data-item-id="'+it.id+'" '+(curSk?'checked':'')+'/>'+
-        '<span>ベース「Skeleton（人型ベース）」を非表示にする</span></label>' +
       '</div>' +
     '</div>' +
     '<div class="meta-row">' +
@@ -977,10 +959,6 @@ function renderItem(it){
     if(he) he.addEventListener('input', onBaseHpInput);
     const de = body.querySelector('.base-dmg-input');
     if(de) de.addEventListener('input', onBaseDmgInput);
-    const wf = body.querySelector('.base-hide4w-input');
-    if(wf) wf.addEventListener('change', onBaseHide4WInput);
-    const sk = body.querySelector('.base-hideskel-input');
-    if(sk) sk.addEventListener('change', onBaseHideSkelInput);
   }, 0);
 
   const bodyTb = document.createElement('div');
@@ -1013,7 +991,7 @@ function renderItem(it){
       '<thead><tr>' +
       '<th>カテゴリ</th><th>パーツ名</th><th class="num">ID</th>' +
       '<th class="num">スケール</th><th class="num">DMG倍率（編集可）</th>' +
-      '<th class="num">個数</th><th class="num">表示</th><th class="num">削除</th></tr></thead>';
+      '<th class="num">個数</th><th class="num">削除</th></tr></thead>';
     const tbody = document.createElement('tbody');
     weaponsToShow.forEach(w => {
       const tr = document.createElement('tr');
@@ -1024,9 +1002,6 @@ function renderItem(it){
       const catClass = w.category.replace(/\s+/g, '');
       const nameHtml = escapeHTML(w.name) +
         (w.nameEn ? '<span class="part-name-en">' + escapeHTML(w.nameEn) + '</span>' : '');
-      // 非表示状態：このグループの全インスタンスが hidden に含まれるか
-      const allHidden = w.instances.every(inst => it.hidden && it.hidden.has(inst.blockStart));
-      if(allHidden) tr.classList.add('hidden-weapon');
       tr.innerHTML =
         '<td><span class="cat '+catClass+'">'+escapeHTML(w.category)+'</span></td>' +
         '<td>'+nameHtml+'</td>' +
@@ -1034,7 +1009,6 @@ function renderItem(it){
         '<td class="num">'+fmt(w.scale)+'×</td>' +
         '<td class="num"></td>' +
         '<td class="num count">×'+w.count+'</td>' +
-        '<td class="num"></td>' +
         '<td class="num"></td>';
       const dmgCell = tr.children[4];
       const input = document.createElement('input');
@@ -1047,18 +1021,8 @@ function renderItem(it){
       input.disabled = !w.isWeapon || allDeleted;
       input.addEventListener('input', onDmgInput);
       dmgCell.appendChild(input);
-      // 表示/非表示トグル（削除の前の列）
-      const visCell = tr.children[6];
-      const visBtn = document.createElement('button');
-      visBtn.type = 'button';
-      visBtn.className = 'visibility-toggle' + (allHidden ? ' hidden' : '');
-      visBtn.textContent = allHidden ? '👁‍🗨 非表示' : '👁 表示';
-      visBtn.dataset.itemId = it.id;
-      visBtn.dataset.groupIdx = String(groupIdx);
-      visBtn.addEventListener('click', onVisibilityToggle);
-      visCell.appendChild(visBtn);
       // 削除/復元ボタン
-      const delCell = tr.children[7];
+      const delCell = tr.children[6];
       const delBtn = document.createElement('button');
       delBtn.type = 'button';
       delBtn.className = 'del-btn' + (allDeleted ? ' undo' : '');
@@ -1089,12 +1053,9 @@ function renderItem(it){
     } else if(action === 'reset'){
       it.edits = new Map();
       it.deleted = new Set();
-      it.hidden = new Set();
       delete it.newPrefabName;
       delete it.newHpRaw;
       delete it.newDmgRaw;
-      delete it.newHide4W;
-      delete it.newHideSkel;
       it.modified = false;
       render();
     } else if(action === 'download'){
@@ -1183,47 +1144,6 @@ function onBaseDmgInput(e){
   updateModifiedState(item);
 }
 
-function onBaseHide4WInput(e){
-  const item = state.items.find(x => x.id === e.target.dataset.itemId);
-  if(!item) return;
-  if(e.target.checked) item.newHide4W = true;
-  else delete item.newHide4W;
-  updateModifiedState(item);
-}
-
-function onBaseHideSkelInput(e){
-  const item = state.items.find(x => x.id === e.target.dataset.itemId);
-  if(!item) return;
-  if(e.target.checked) item.newHideSkel = true;
-  else delete item.newHideSkel;
-  updateModifiedState(item);
-}
-
-function onVisibilityToggle(e){
-  e.preventDefault();
-  e.stopPropagation();
-  const btn = e.currentTarget;
-  const item = state.items.find(x => x.id === btn.dataset.itemId);
-  if(!item) return;
-  const group = item.summary.weapons[parseInt(btn.dataset.groupIdx, 10)];
-  if(!group) return;
-  if(!item.hidden) item.hidden = new Set();
-  const allCurrentlyHidden = group.instances.every(inst => item.hidden.has(inst.blockStart));
-  if(allCurrentlyHidden){
-    for(const inst of group.instances) item.hidden.delete(inst.blockStart);
-  } else {
-    for(const inst of group.instances) item.hidden.add(inst.blockStart);
-  }
-  updateModifiedState(item);
-  const openIds = new Set();
-  document.querySelectorAll('.result.open').forEach(el => openIds.add(el.getAttribute('data-result-id')));
-  const scrollY = window.scrollY;
-  render();
-  document.querySelectorAll('.result').forEach(el => {
-    if(openIds.has(el.getAttribute('data-result-id'))) el.classList.add('open');
-  });
-  window.scrollTo(0, scrollY);
-}
 
 function onDeleteToggle(e){
   e.preventDefault();
@@ -1258,12 +1178,10 @@ function onDeleteToggle(e){
 function updateModifiedState(item){
   const hasEdits = item.edits && item.edits.size > 0;
   const hasDeletions = item.deleted && item.deleted.size > 0;
-  const hasHidden = item.hidden && item.hidden.size > 0;
   const hasNameChange = item.newPrefabName !== undefined;
   const hasHpChange = item.newHpRaw !== undefined;
   const hasDmgChange = item.newDmgRaw !== undefined;
-  const hasBaseHide = item.newHide4W !== undefined || item.newHideSkel !== undefined;
-  item.modified = hasEdits || hasDeletions || hasHidden || hasNameChange || hasHpChange || hasDmgChange || hasBaseHide;
+  item.modified = hasEdits || hasDeletions || hasNameChange || hasHpChange || hasDmgChange;
   const result = document.querySelector('[data-result-id="'+item.id+'"]');
   if(result) result.classList.toggle('modified', item.modified);
   const dl = document.getElementById('dl-'+item.id);
@@ -1274,11 +1192,8 @@ function updateModifiedState(item){
     if(item.newPrefabName !== undefined) parts.push('名前変更');
     if(item.newHpRaw !== undefined) parts.push('HP変更');
     if(item.newDmgRaw !== undefined) parts.push('攻撃倍率変更');
-    if(item.newHide4W) parts.push('4W非表示');
-    if(item.newHideSkel) parts.push('Skel非表示');
     if(item.edits && item.edits.size) parts.push(item.edits.size + ' 武器の倍率変更');
     if(item.deleted && item.deleted.size) parts.push(item.deleted.size + ' 武器を削除');
-    if(item.hidden && item.hidden.size) parts.push(item.hidden.size + ' 武器を非表示');
     info.textContent = parts.length ? parts.join(' / ') : '変更なし';
   }
 }
@@ -1306,44 +1221,6 @@ function downloadModified(item){
     baseEdits.push({ offset: item.summary.dmgOffset, newRawValue: item.newDmgRaw });
   }
   let modified = applyEdits(item.originalBytes, [...rearrangeEdits, ...dmgEdits, ...baseEdits]);
-
-  // 新規 prop 追加（非表示武器・ベース非表示） — endOffを共有して使う
-  if(item.summary.pairsMeta && (
-      (item.hidden && item.hidden.size > 0) || item.newHide4W || item.newHideSkel)){
-    const meta = item.summary.pairsMeta;
-    let endOff = meta.endOffset;
-    let newId = meta.nextNewId;
-    // 非表示武器
-    if(item.hidden && item.hidden.size > 0){
-      const hiddenIndices = [];
-      let newIndex = 0;
-      for(const block of allBlocks){
-        if(deletedSet.has(block.blockStart)) continue;
-        if(item.hidden.has(block.blockStart)) hiddenIndices.push(newIndex);
-        newIndex++;
-      }
-      if(hiddenIndices.length > 0){
-        // 武器ブロック(100..)・ARBS基本設定(0..4) と絶対被らない領域を使う
-        // key=10000: hidden 武器数、key=10001+: hidden 武器インデックス
-        const r1 = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId--, 10000, hiddenIndices.length);
-        modified = r1.bytes; endOff = r1.newEndOffset;
-        for(let i = 0; i < hiddenIndices.length; i++){
-          const r = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId--, 10001 + i, hiddenIndices[i]);
-          modified = r.bytes; endOff = r.newEndOffset;
-        }
-      }
-    }
-    // ベース 4Wheeler 非表示 (key=20000)
-    if(item.newHide4W){
-      const r = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId--, 20000, 1);
-      modified = r.bytes; endOff = r.newEndOffset;
-    }
-    // ベース Skeleton 非表示 (key=20001)
-    if(item.newHideSkel){
-      const r = appendKeyValuePair(modified, meta.lengthOffset, endOff, meta.metadataId, newId--, 20001, 1);
-      modified = r.bytes; endOff = r.newEndOffset;
-    }
-  }
 
   if(item.newPrefabName !== undefined && item.summary.prefabNameRange){
     const { lpsStart, lpsEnd } = item.summary.prefabNameRange;
