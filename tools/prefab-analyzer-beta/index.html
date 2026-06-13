@@ -1,0 +1,2336 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ARBS Prefab Analyzer — AKISI Tools</title>
+<meta name="robots" content="noindex,nofollow" />
+<style>
+:root {
+  --bg: #06060c;
+  --bg-soft: #0d0d18;
+  --bg-card: #11111e;
+  --bg-edit: #1a1a2e;
+  --border: #1f1f33;
+  --border-soft: #181828;
+  --text: #e6e7f0;
+  --text-soft: #8a8ca0;
+  --text-muted: #555770;
+  --cyan: #00f0ff;
+  --cyan-soft: #00f0ff33;
+  --red: #ff3050;
+  --yellow: #fff200;
+  --green: #3fd97a;
+  --pink: #ff60b0;
+  --orange: #ff9133;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif; }
+a { color: var(--cyan); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 32px; border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 12px; font-weight: 900; letter-spacing: 4px; }
+.brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
+.nav .crumb { color: var(--text-soft); font-size: 13px; letter-spacing: 2px; }
+
+.wrap { max-width: 1280px; margin: 0 auto; padding: 48px 32px; }
+h1 { margin: 0 0 8px 0; font-size: 40px; letter-spacing: 2px; }
+.subtitle { color: var(--text-soft); margin: 0 0 32px; font-size: 15px; }
+.subtitle code { background: var(--bg-soft); padding: 2px 8px; border-radius: 4px; font-size: 13px; color: var(--cyan); }
+
+.drop {
+  display: block;
+  width: 100%;
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  padding: 64px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .15s ease;
+  background: linear-gradient(180deg, transparent, var(--bg-soft) 100%);
+  box-sizing: border-box;
+}
+.drop:hover, .drop.dragover {
+  border-color: var(--cyan);
+  background: var(--cyan-soft);
+}
+.drop .big { font-size: 24px; font-weight: 900; margin-bottom: 8px; }
+.drop .small { color: var(--text-soft); font-size: 13px; }
+.drop input[type="file"] { display: none; }
+
+.toolbar {
+  display: flex; gap: 16px; margin: 32px 0 16px; flex-wrap: wrap; align-items: center;
+}
+.toolbar button, .toolbar select {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.toolbar button:hover { border-color: var(--cyan); color: var(--cyan); }
+.toolbar label.checkbox { display: inline-flex; align-items: center; gap: 6px; color: var(--text-soft); font-size: 13px; cursor: pointer; }
+.toolbar label.checkbox input { accent-color: var(--cyan); }
+.toolbar .count { color: var(--text-soft); font-size: 13px; margin-left: auto; }
+
+.results { display: grid; gap: 16px; }
+.result {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.result.error { border-color: var(--red); }
+.result.modified { border-color: var(--yellow); }
+.result-head {
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: 80px 2fr 1fr 1fr 1fr 1fr auto;
+  gap: 16px;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+.result-head .thumb {
+  width: 80px;
+  height: 64px;
+  border-radius: 8px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.result-head .thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.result-head .thumb .no-img {
+  font-size: 22px;
+  color: var(--text-muted);
+}
+.result-head:hover { background: var(--bg-soft); }
+.result-head .name { font-weight: 900; font-size: 18px; word-break: break-all; }
+.result-head .name .mod-flag { display: inline-block; background: var(--yellow); color: #000; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-left: 8px; font-weight: 900; letter-spacing: 1px; }
+.result-head .label { font-size: 11px; color: var(--text-muted); letter-spacing: 1.5px; }
+.result-head .val { font-size: 14px; color: var(--text); }
+.result-head .val.hp { color: var(--green); }
+.result-head .val.dmg { color: var(--red); }
+.result-head .val.weapons { color: var(--cyan); font-weight: 900; }
+.result-head .toggle { color: var(--text-soft); font-size: 18px; transition: transform .2s; }
+.result.open .toggle { transform: rotate(90deg); color: var(--cyan); }
+
+.result-body { display: none; padding: 0 24px 24px; border-top: 1px solid var(--border-soft); }
+.result.open .result-body { display: block; }
+
+.meta-row { display: flex; gap: 24px; margin: 16px 0; flex-wrap: wrap; color: var(--text-soft); font-size: 12px; }
+.meta-row span b { color: var(--text); margin-right: 6px; }
+
+.base-edit { background: var(--bg-soft); border: 1px solid var(--border-soft); border-radius: 8px; padding: 14px 16px; margin: 16px 0; }
+.base-edit-row { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 10px; }
+.base-edit-row:last-child { margin-bottom: 0; }
+.base-edit-field { flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 4px; }
+.base-edit-field-small { flex: 0 1 180px; display: flex; flex-direction: column; gap: 4px; }
+.base-edit-field span, .base-edit-field-small span { font-size: 11px; color: var(--text-muted); letter-spacing: 1px; }
+.base-edit-field input, .base-edit-field-small input {
+  background: var(--bg-edit); color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; padding: 6px 10px; font-size: 14px; font-family: inherit;
+}
+.base-edit-field input:focus, .base-edit-field-small input:focus { outline: none; border-color: var(--cyan); }
+.base-edit-field input.changed, .base-edit-field-small input.changed { border-color: var(--yellow); color: var(--yellow); }
+.base-edit-field-small { position: relative; }
+.base-edit-field-small input { padding-right: 24px; text-align: right; font-variant-numeric: tabular-nums; }
+.base-edit-field-small .suffix { position: absolute; right: 10px; bottom: 7px; color: var(--text-muted); font-size: 13px; pointer-events: none; }
+.base-checkbox { display: inline-flex; align-items: center; gap: 8px; color: var(--text-soft); font-size: 13px; cursor: pointer; padding: 4px 0; }
+.base-checkbox input[type="checkbox"] { accent-color: var(--cyan); width: 16px; height: 16px; cursor: pointer; }
+.base-checkbox span { user-select: none; }
+
+.body-toolbar { display: flex; gap: 12px; align-items: center; margin: 16px 0 8px; flex-wrap: wrap; }
+.body-toolbar .info { color: var(--text-soft); font-size: 12px; }
+.body-toolbar .quick-set { display: inline-flex; align-items: center; gap: 6px; }
+.body-toolbar input.quick-input {
+  background: var(--bg-edit); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 10px; width: 70px; font-size: 13px; text-align: right;
+}
+.body-toolbar button {
+  background: var(--bg-card); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer;
+}
+.body-toolbar button:hover { border-color: var(--cyan); color: var(--cyan); }
+.body-toolbar button.primary { background: var(--cyan); color: #000; border-color: var(--cyan); font-weight: 900; }
+.body-toolbar button.primary:hover { background: #80f7ff; color: #000; }
+.body-toolbar button.primary:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; border-color: var(--border); }
+
+table.weapons { width: 100%; border-collapse: collapse; margin-top: 12px; }
+table.weapons th, table.weapons td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+table.weapons th { color: var(--text-muted); font-weight: 500; letter-spacing: 1px; font-size: 11px; text-transform: uppercase; }
+table.weapons tr:hover { background: var(--bg-soft); }
+table.weapons .cat { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; letter-spacing: 1px; }
+table.weapons .cat.UnitCreator { background: #00f0ff22; color: var(--cyan); }
+table.weapons .cat.Weapons { background: #ff305022; color: var(--red); }
+table.weapons .cat.Animals { background: #fff20022; color: var(--yellow); }
+table.weapons .cat.Buildings { background: #3fd97a22; color: var(--green); }
+table.weapons .cat.Landscape { background: #ff913322; color: var(--orange); }
+table.weapons .cat.Unknown, table.weapons .cat.UnknownPart { background: #88888822; color: var(--text-soft); }
+table.weapons .num { text-align: right; font-variant-numeric: tabular-nums; }
+table.weapons .count { font-weight: 900; color: var(--cyan); }
+table.weapons .dmg-input {
+  background: var(--bg-edit); color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; padding: 4px 8px; width: 80px; font-size: 13px; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+table.weapons .dmg-input:focus { outline: none; border-color: var(--cyan); }
+table.weapons .dmg-input.changed { border-color: var(--yellow); color: var(--yellow); }
+table.weapons tr.non-weapon { opacity: 0.45; }
+table.weapons tr.non-weapon .dmg-input { background: transparent; border-color: var(--border-soft); color: var(--text-muted); }
+table.weapons tr.deleted { opacity: 0.3; text-decoration: line-through; }
+table.weapons tr.deleted .dmg-input { background: transparent; color: var(--text-muted); }
+table.weapons .del-btn {
+  background: transparent; color: var(--red); border: 1px solid var(--red);
+  border-radius: 4px; padding: 3px 10px; font-size: 11px; cursor: pointer;
+  font-weight: 700; letter-spacing: 1px;
+}
+table.weapons .del-btn:hover { background: var(--red); color: #000; }
+table.weapons .del-btn.undo { color: var(--cyan); border-color: var(--cyan); }
+table.weapons .del-btn.undo:hover { background: var(--cyan); color: #000; }
+table.weapons .part-name-en { color: var(--text-muted); font-size: 11px; margin-left: 6px; }
+
+.error-msg { padding: 24px; color: var(--red); font-size: 14px; }
+
+.empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 60px 0;
+}
+
+footer { padding: 32px; text-align: center; color: var(--text-muted); font-size: 12px; border-top: 1px solid var(--border); margin-top: 64px; }
+
+/* 色変更可能ブロック セクション */
+.color-block-section {
+  margin: 16px 24px;
+  padding: 12px 16px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.color-block-section .cb-header {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+.color-block-section .cb-count {
+  color: var(--text-soft);
+  font-weight: 400;
+  font-size: 12px;
+  margin-left: 6px;
+}
+table.color-blocks { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.color-blocks th {
+  text-align: left;
+  padding: 6px 8px;
+  background: var(--bg-card);
+  color: var(--text-soft);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+table.color-blocks td { padding: 8px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+table.color-blocks td.cb-name { font-weight: 600; color: var(--text); }
+.color-chip {
+  display: inline-block;
+  min-width: 28px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  margin-right: 4px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.num-chip {
+  display: inline-block;
+  background: var(--bg-card);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  margin: 2px 4px 2px 0;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.cb-meta {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  margin-left: 4px;
+}
+.cb-pair.deleted-row { opacity: 0.5; }
+.cb-pair.deleted-row .cb-curr { text-decoration: line-through; }
+.cb-pair .del-btn {
+  margin-left: 8px;
+  background: transparent;
+  color: var(--red);
+  border: 1px solid var(--red);
+  border-radius: 4px;
+  padding: 2px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.cb-pair .del-btn:hover { background: var(--red); color: #000; }
+.cb-pair .del-btn.undo { color: var(--cyan); border-color: var(--cyan); }
+.cb-pair .del-btn.undo:hover { background: var(--cyan); color: #000; }
+.cb-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border-soft);
+}
+.cb-pair:last-child { border-bottom: none; }
+.cb-curr {
+  min-width: 110px;
+  font-weight: 600;
+  color: var(--text);
+}
+.color-chip-small {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-right: 4px;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.num-chip-small {
+  display: inline-block;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 10px;
+  margin-right: 4px;
+}
+.cb-arrow { color: var(--text-muted); font-weight: 700; }
+.cb-cat {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  margin-left: 6px;
+}
+.cb-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 8px;
+}
+table.color-blocks td.cb-pairs { padding: 4px 8px; }
+
+input.cb-select {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  width: 140px;
+}
+.cb-select {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cb-select:hover { border-color: var(--cyan); }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="brand">
+    <span class="dot"></span>
+    <span>AKISI</span>
+    <span class="crumb">/ TOOLS / PREFAB ANALYZER</span>
+  </div>
+  <a href="/">← Back to AKISI</a>
+</nav>
+
+<div class="wrap">
+  <h1>Prefab Analyzer</h1>
+  <p class="subtitle">
+    ARBS の <code>WEP_ANIM_PREF_*</code> ファイルを解析し、ベースユニット・HP/攻撃倍率・スケール・装着武器を一覧表示。
+    武器の攻撃倍率は<strong style="color:var(--yellow)">編集してダウンロード可能</strong>。
+    <br>すべての処理はブラウザ内で完結します（ファイルはサーバーに送信されません）。
+  </p>
+
+  <label class="drop" id="drop">
+    <input type="file" id="file" multiple />
+    <div class="big">プレハブファイルをドラッグ&ドロップ</div>
+    <div class="small">複数選択可 / <code>WEP_ANIM_PREF_</code> から始まるバイナリファイル（拡張子なし）</div>
+  </label>
+
+  <div class="toolbar" id="toolbar" style="display:none">
+    <button id="expandAll">すべて展開</button>
+    <button id="collapseAll">すべて折りたたみ</button>
+    <select id="sort">
+      <option value="name">並び順：プレハブ名</option>
+      <option value="weapons">並び順：武器数（多い順）</option>
+      <option value="hp">並び順：HP倍率（高い順）</option>
+      <option value="dmg">並び順：攻撃倍率（高い順）</option>
+    </select>
+    <label class="checkbox"><input type="checkbox" id="showAll" /> 装飾パーツも表示</label>
+    <button id="clear">クリア</button>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="results" id="results"></div>
+  <div class="empty" id="empty">ファイルをアップロードすると結果がここに表示されます</div>
+</div>
+
+<footer>
+  <div>AKISI Tools / Prefab Analyzer (Edit Mode)</div>
+  <div>Prefab map: 1375 entries / Weapon list: 131 attack-capable parts (extracted from Assembly-CSharp.dll)</div>
+</footer>
+
+<script>
+/* ============================================================
+   武器ID＆正式名マップ（ユーザー提供：ARBSメニュー121件）
+   ============================================================ */
+// === ACCURATE バリエーション変換マップ (色変えセッション・実機検証済み 44グループ・291番号) ===
+const VARIANT_GROUPS = {
+  "装飾_フェザー先丸大": {
+    "displayName": "フェザー先丸大",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "白": 4126,
+      "黄": 4127,
+      "白2": 4128,
+      "緑": 4129,
+      "橙": 4130,
+      "赤": 4131,
+      "紫": 4132,
+      "青": 4133,
+      "紫2": 4134
+    }
+  },
+  "装飾_フェザー先丸ギザ": {
+    "displayName": "フェザー先丸ギザ",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "白": 4117,
+      "黄": 4118,
+      "白2": 4119,
+      "緑": 4120,
+      "橙": 4121,
+      "赤": 4122,
+      "紫": 4123,
+      "青": 4124,
+      "紫2": 4125
+    }
+  },
+  "装飾_フェザー先角大": {
+    "displayName": "フェザー先角大",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "白": 4108,
+      "黄": 4109,
+      "白2": 4110,
+      "緑": 4111,
+      "橙": 4112,
+      "赤": 4113,
+      "紫": 4114,
+      "青": 4115,
+      "紫2": 4116
+    }
+  },
+  "装飾_フェザー先丸小": {
+    "displayName": "フェザー先丸小",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "白": 4099,
+      "黄": 4100,
+      "白2": 4101,
+      "緑": 4102,
+      "橙": 4103,
+      "赤": 4104,
+      "紫": 4105,
+      "青": 4106,
+      "紫2": 4107
+    }
+  },
+  "装飾_フェザー先鋭細": {
+    "displayName": "フェザー先鋭細",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "白": 4090,
+      "黄": 4091,
+      "白2": 4092,
+      "緑": 4093,
+      "橙": 4094,
+      "赤": 4095,
+      "紫": 4096,
+      "青": 4097,
+      "紫2": 4098
+    }
+  },
+  "装飾_目1": {
+    "displayName": "目1",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "青": 4151,
+      "黒": 4152,
+      "緑": 4153,
+      "赤": 4154,
+      "黄": 4155
+    }
+  },
+  "装飾_目2": {
+    "displayName": "目2",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "青": 4156,
+      "黒": 4157,
+      "緑": 4158,
+      "赤": 4159,
+      "黄": 4160
+    }
+  },
+  "装飾_目3": {
+    "displayName": "目3",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "黒": 4161,
+      "茶": 4162,
+      "緑赤": 4163,
+      "緑": 4164,
+      "赤": 4165,
+      "黄": 4166
+    }
+  },
+  "装飾_輝く目": {
+    "displayName": "輝く目",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "青": 4302,
+      "緑": 4303,
+      "赤": 4304,
+      "紫": 4305,
+      "白": 4306,
+      "黄": 4307
+    }
+  },
+  "装飾_帽子低": {
+    "displayName": "帽子低",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "キャップ": 4173,
+      "サンタ": 4174,
+      "ハット": 4175,
+      "チェック": 4176,
+      "探偵": 4177,
+      "王冠": 4178
+    }
+  },
+  "装飾_帽子高": {
+    "displayName": "帽子高",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "キャップ": 4167,
+      "サンタ": 4168,
+      "ハット": 4169,
+      "チェック": 4170,
+      "探偵": 4171,
+      "王冠": 4172
+    }
+  },
+  "装飾_メガネ": {
+    "displayName": "メガネ",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "ｻﾝｸﾞﾗｽ黒": 4179,
+      "ｻﾝｸﾞﾗｽ赤": 4180,
+      "ｻﾝｸﾞﾗｽ緑": 4181,
+      "ｻﾝｸﾞﾗｽ白": 4182,
+      "額縁黒": 4183,
+      "額縁赤": 4184,
+      "額縁緑": 4185,
+      "額縁白": 4186
+    }
+  },
+  "装飾_スパークル1": {
+    "displayName": "スパークル1",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "青": 4308,
+      "緑": 4309,
+      "紫": 4310,
+      "赤": 4311,
+      "白": 4312,
+      "黄": 4313
+    }
+  },
+  "装飾_スパークル2": {
+    "displayName": "スパークル2",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "青": 4314,
+      "緑": 4315,
+      "紫": 4316,
+      "赤": 4317,
+      "白": 4318,
+      "黄": 4319
+    }
+  },
+  "装飾_炎一定": {
+    "displayName": "炎一定",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "赤": 4625,
+      "青": 4626,
+      "緑": 4627,
+      "黄": 4628,
+      "紫": 4629
+    }
+  },
+  "装飾_炎モーション": {
+    "displayName": "炎モーション",
+    "category": "装飾",
+    "type": "color",
+    "options": {
+      "赤": 4620,
+      "青": 4621,
+      "緑": 4622,
+      "黄": 4623,
+      "紫": 4624
+    }
+  },
+  "アーマー_ハーフブロック": {
+    "displayName": "ハーフブロック",
+    "category": "アーマー",
+    "type": "color",
+    "options": {
+      "紫": 4007,
+      "赤": 4008,
+      "黄": 4009,
+      "緑": 4010,
+      "黒": 4011,
+      "白": 4012
+    }
+  },
+  "アーマー_八角形": {
+    "displayName": "八角形",
+    "category": "アーマー",
+    "type": "color",
+    "options": {
+      "紫": 4013,
+      "赤": 4014,
+      "黄": 4015,
+      "緑": 4016,
+      "黒": 4017,
+      "白": 4018
+    }
+  },
+  "アーマー_タイル筋有": {
+    "displayName": "タイル筋有",
+    "category": "アーマー",
+    "type": "color",
+    "options": {
+      "木": 4040,
+      "茶": 4041,
+      "灰": 4042,
+      "銅": 4043,
+      "銀": 4044,
+      "黒": 4045
+    }
+  },
+  "アーマー_タイル筋無": {
+    "displayName": "タイル筋無",
+    "category": "アーマー",
+    "type": "color",
+    "options": {
+      "木": 4046,
+      "茶": 4047,
+      "灰": 4048,
+      "銅": 4049,
+      "銀": 4050,
+      "黒": 4051
+    }
+  },
+  "アーマー_鱗先丸": {
+    "displayName": "鱗先丸",
+    "category": "アーマー",
+    "type": "color",
+    "options": {
+      "金": 4135,
+      "銀": 4136,
+      "青": 4137,
+      "緑": 4138,
+      "赤": 4139,
+      "黄": 4140,
+      "ピンク": 4141,
+      "黒": 4142
+    }
+  },
+  "アーマー_鱗先鋭": {
+    "displayName": "鱗先鋭",
+    "category": "アーマー",
+    "type": "color",
+    "options": {
+      "金": 4143,
+      "銀": 4144,
+      "青": 4145,
+      "緑": 4146,
+      "赤": 4147,
+      "黄": 4148,
+      "ピンク": 4149,
+      "黒": 4150
+    }
+  },
+  "アーマー_兜": {
+    "displayName": "兜",
+    "category": "アーマー",
+    "type": "color",
+    "options": {
+      "鉄仮面1": 4187,
+      "鉄仮面2": 4188,
+      "金": 4189,
+      "メタルヘルム": 4190,
+      "暗黒": 4191
+    }
+  },
+  "ロボティック_形状1": {
+    "displayName": "ロボパーツ 形状1",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4382,
+      "青": 4418,
+      "緑": 4454,
+      "橙": 4490,
+      "ピンク": 4526,
+      "赤": 4562,
+      "灰": 4598
+    }
+  },
+  "ロボティック_形状2": {
+    "displayName": "ロボパーツ 形状2",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4383,
+      "青": 4419,
+      "緑": 4455,
+      "橙": 4491,
+      "ピンク": 4527,
+      "赤": 4563,
+      "灰": 4599
+    }
+  },
+  "ロボティック_形状3": {
+    "displayName": "ロボパーツ 形状3",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4384,
+      "青": 4420,
+      "緑": 4456,
+      "橙": 4492,
+      "ピンク": 4528,
+      "赤": 4564,
+      "灰": 4600
+    }
+  },
+  "ロボティック_形状4": {
+    "displayName": "ロボパーツ 形状4",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4385,
+      "青": 4421,
+      "緑": 4457,
+      "橙": 4493,
+      "ピンク": 4529,
+      "赤": 4565,
+      "灰": 4601
+    }
+  },
+  "ロボティック_形状5": {
+    "displayName": "ロボパーツ 形状5",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4386,
+      "青": 4422,
+      "緑": 4458,
+      "橙": 4494,
+      "ピンク": 4530,
+      "赤": 4566,
+      "灰": 4602
+    }
+  },
+  "ロボティック_形状6": {
+    "displayName": "ロボパーツ 形状6",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4387,
+      "青": 4423,
+      "緑": 4459,
+      "橙": 4495,
+      "ピンク": 4531,
+      "赤": 4567,
+      "灰": 4603
+    }
+  },
+  "ロボティック_形状7": {
+    "displayName": "ロボパーツ 形状7",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4388,
+      "青": 4424,
+      "緑": 4460,
+      "橙": 4496,
+      "ピンク": 4532,
+      "赤": 4568,
+      "灰": 4604
+    }
+  },
+  "ロボティック_形状8": {
+    "displayName": "ロボパーツ 形状8",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4389,
+      "青": 4425,
+      "緑": 4461,
+      "橙": 4497,
+      "ピンク": 4533,
+      "赤": 4569,
+      "灰": 4605
+    }
+  },
+  "ロボティック_形状9": {
+    "displayName": "ロボパーツ 形状9",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4390,
+      "青": 4426,
+      "緑": 4462,
+      "橙": 4498,
+      "ピンク": 4534,
+      "赤": 4570,
+      "灰": 4606
+    }
+  },
+  "ロボティック_形状10": {
+    "displayName": "ロボパーツ 形状10",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4391,
+      "青": 4427,
+      "緑": 4463,
+      "橙": 4499,
+      "ピンク": 4535,
+      "赤": 4571,
+      "灰": 4607
+    }
+  },
+  "ロボティック_形状11": {
+    "displayName": "ロボパーツ 形状11",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4392,
+      "青": 4428,
+      "緑": 4464,
+      "橙": 4500,
+      "ピンク": 4536,
+      "赤": 4572,
+      "灰": 4608
+    }
+  },
+  "ロボティック_形状12": {
+    "displayName": "ロボパーツ 形状12",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4393,
+      "青": 4429,
+      "緑": 4465,
+      "橙": 4501,
+      "ピンク": 4537,
+      "赤": 4573,
+      "灰": 4609
+    }
+  },
+  "ロボティック_形状13": {
+    "displayName": "ロボパーツ 形状13",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4394,
+      "青": 4430,
+      "緑": 4466,
+      "橙": 4502,
+      "ピンク": 4538,
+      "赤": 4574,
+      "灰": 4610
+    }
+  },
+  "ロボティック_形状14": {
+    "displayName": "ロボパーツ 形状14",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4395,
+      "青": 4431,
+      "緑": 4467,
+      "橙": 4503,
+      "ピンク": 4539,
+      "赤": 4575,
+      "灰": 4611
+    }
+  },
+  "ロボティック_形状15": {
+    "displayName": "ロボパーツ 形状15",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4396,
+      "青": 4432,
+      "緑": 4468,
+      "橙": 4504,
+      "ピンク": 4540,
+      "赤": 4576,
+      "灰": 4612
+    }
+  },
+  "ロボティック_形状16": {
+    "displayName": "ロボパーツ 形状16",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4397,
+      "青": 4433,
+      "緑": 4469,
+      "橙": 4505,
+      "ピンク": 4541,
+      "赤": 4577,
+      "灰": 4613
+    }
+  },
+  "ロボティック_形状17": {
+    "displayName": "ロボパーツ 形状17",
+    "category": "ロボティック",
+    "type": "color",
+    "options": {
+      "黒": 4398,
+      "青": 4434,
+      "緑": 4470,
+      "橙": 4506,
+      "ピンク": 4542,
+      "赤": 4578,
+      "灰": 4614
+    }
+  },
+  "アーマー_盾": {
+    "displayName": "盾",
+    "category": "アーマー",
+    "type": "number",
+    "options": {
+      "スパイク": 4019,
+      "騎士": 4020,
+      "ウッド": 4021,
+      "装甲": 4022,
+      "赤": 4344,
+      "丸": 4345,
+      "騎士2": 4346,
+      "骸骨": 4347
+    }
+  },
+  "アーマー_支柱": {
+    "displayName": "支柱",
+    "category": "アーマー",
+    "type": "number",
+    "options": {
+      "短": 4197,
+      "中": 4196,
+      "長": 4023
+    }
+  },
+  "アーマー_板": {
+    "displayName": "板",
+    "category": "アーマー",
+    "type": "number",
+    "options": {
+      "長": 4332,
+      "中": 4333,
+      "短": 4334
+    }
+  },
+  "アーマー_ブロック": {
+    "displayName": "ブロック",
+    "category": "アーマー",
+    "type": "number",
+    "options": {
+      "薄": 4335,
+      "小": 4336,
+      "中": 4337,
+      "長": 4338
+    }
+  }
+};
+
+const COLOR_HEX = {
+  "白": "#ffffff",
+  "白2": "#ffffff",
+  "黄": "#f1c40f",
+  "緑": "#2ecc71",
+  "橙": "#e67e22",
+  "赤": "#e74c3c",
+  "紫": "#9b59b6",
+  "紫2": "#9b59b6",
+  "青": "#3498db",
+  "黒": "#2c3e50",
+  "茶": "#a0522d",
+  "緑赤": "#5fa450",
+  "ピンク": "#fd79a8",
+  "灰": "#95a5a6",
+  "金": "#d4af37",
+  "銀": "#bdc3c7",
+  "銅": "#b87333",
+  "木": "#deb887",
+  "キャップ": "#666",
+  "サンタ": "#e74c3c",
+  "ハット": "#444",
+  "チェック": "#666",
+  "探偵": "#444",
+  "王冠": "#d4af37",
+  "ｻﾝｸﾞﾗｽ黒": "#222",
+  "ｻﾝｸﾞﾗｽ赤": "#e74c3c",
+  "ｻﾝｸﾞﾗｽ緑": "#2ecc71",
+  "ｻﾝｸﾞﾗｽ白": "#eee",
+  "額縁黒": "#222",
+  "額縁赤": "#e74c3c",
+  "額縁緑": "#2ecc71",
+  "額縁白": "#eee",
+  "鉄仮面1": "#666",
+  "鉄仮面2": "#777",
+  "メタルヘルム": "#888",
+  "暗黒": "#222"
+};
+
+// 逆引きテーブル：prefabIndex → {groupKey, label}
+const PREFAB_ID_TO_GROUP = {};
+for(const [gkey, info] of Object.entries(VARIANT_GROUPS)){
+  for(const [label, id] of Object.entries(info.options)){
+    PREFAB_ID_TO_GROUP[id] = {groupKey: gkey, label};
+  }
+}
+
+const WEAPON_NAMES_JA = {
+  4000:"ピアサー",4001:"ダイナマイト",4002:"マシンガン",4003:"ミサイルランチャー",
+  4004:"鋼の触手",4005:"もり",4006:"スパイク(スピア)",
+  4024:"触手(茶)",4025:"触手(黄)",4026:"触手(赤)",4027:"触手(青)",
+  4028:"ボーンスパイク(短白)",4029:"ボーンスパイク(短赤)",4030:"ボーンスパイク(長白)",4031:"ボーンスパイク(長赤)",
+  4032:"ボーンスパイク(短白曲)",4033:"ボーンスパイク(短赤曲)",4034:"ボーンスパイク(長白曲)",4035:"ボーンスパイク(長赤曲)",
+  4036:"パンチャー(人1右)",4037:"パンチャー(溶岩右)",4038:"パンチャー(ゴリラ右)",4039:"パンチャー(スケルトン右)",
+  4058:"パンチャー(人1左)",4059:"パンチャー(溶岩左)",4060:"パンチャー(ゴリラ左)",4061:"パンチャー(スケルトン左)",
+  4062:"ソードハンド(人1右)",4063:"ソードハンド(人1左)",4064:"ソードハンド(溶岩右)",4065:"ソードハンド(溶岩左)",
+  4066:"ソードハンド(ゴリラ右)",4067:"ソードハンド(ゴリラ左)",4068:"ソードハンド(スケルトン右)",4069:"ソードハンド(スケルトン左)",
+  4070:"ハンマーハンド(人1右)",4071:"ハンマーハンド(人1左)",4072:"ハンマーハンド(溶岩右)",4073:"ハンマーハンド(溶岩左)",
+  4074:"ハンマーハンド(ゴリラ右)",4075:"ハンマーハンド(ゴリラ左)",4076:"ハンマーハンド(スケルトン右)",4077:"ハンマーハンド(スケルトン左)",
+  4078:"槍の手(人1右)",4079:"槍の手(人1左)",4080:"槍の手(溶岩右)",4081:"槍の手(溶岩左)",
+  4082:"槍の手(ゴリラ右)",4083:"槍の手(ゴリラ左)",4084:"槍の手(スケルトン右)",4085:"槍の手(スケルトン左)",
+  4089:"バリスタ",4192:"ボクシンググローブ",
+  4198:"スパイク(丸黒)",4199:"スパイク(丸金)",4200:"スパイク(丸銀)",
+  4201:"スパイク(角黒)",4202:"スパイク(角金)",4203:"スパイク(角銀)",
+  4204:"ブレード(黒短)",4205:"ブレード(金短)",4206:"ブレード(銀短)",
+  4207:"ブレード(赤短)",4208:"ブレード(青短)",4209:"ブレード(緑短)",
+  4210:"ブレード(黒短曲)",4211:"ブレード(金短曲)",4212:"ブレード(銀短曲)",
+  4213:"ブレード(赤短曲)",4214:"ブレード(青短曲)",4215:"ブレード(緑短曲)",
+  4216:"ブレード(黒長曲)",4217:"ブレード(金長曲)",4218:"ブレード(銀長曲)",
+  4219:"ブレード(赤長曲)",4220:"ブレード(青長曲)",4221:"ブレード(緑長曲)",
+  4230:"パンチャー(人2右)",4231:"パンチャー(人2左)",
+  4232:"ソードハンド(人2右)",4233:"ソードハンド(人2左)",
+  4234:"ハンマーハンド(人2右)",4235:"ハンマーハンド(人2左)",
+  4236:"槍の手(人2右)",4237:"槍の手(人2左)",
+  4257:"爪(ティラノ左腕)",4258:"爪(ティラノ右腕)",
+  4259:"爪(スピノ左腕)",4260:"爪(スピノ右腕)",
+  4261:"爪(アロ左腕)",4262:"爪(アロ右腕)",
+  4263:"爪(クリロフォ左腕)",4264:"爪(クリロフォ右腕)",
+  4265:"爪(テリジノ左腕)",4266:"爪(テリジノ右腕)",
+  4280:"ライトニングガン",
+  4281:"プラズマキャノン(青)",4282:"プラズマキャノン(赤)",4283:"プラズマキャノン(黄)",4284:"プラズマキャノン(紫)",4285:"プラズマキャノン(緑)",
+  4286:"プラズマビーム・T-Rex(青)",4287:"プラズマビーム・T-Rex(赤)",4288:"プラズマビーム・T-Rex(黄)",4289:"プラズマビーム・T-Rex(紫)",4290:"プラズマビーム・T-Rex(緑)",
+  4343:"ロケットランチャー",4354:"火炎放射器(武器2)",
+  4631:"B.O.S.S-ロケット発射台",4632:"B.O.S.S-機関銃",
+  4636:"S.P.I.D.E.R-サンダーボルト",4637:"S.P.I.D.E.R-カミカゼドローン",4638:"S.P.I.D.E.R-プラズマフィールド",
+  4639:"焼夷ロケット",4640:"レールガン",4641:"プラズマキャノン(武器3)",4642:"グランドミサイル",
+  4643:"火炎放射器(武器3)",4644:"対空ミサイル",4645:"イオンシールド",4646:"自動砲塔"
+};
+const WEAPON_IDS = new Set(Object.keys(WEAPON_NAMES_JA).map(k => parseInt(k, 10)));
+
+/* ============================================================
+   NRBF Parser (subset, with offset tracking for KeyValuePair values)
+   ============================================================ */
+class NRBFReader {
+  constructor(buf) {
+    this.view = new DataView(buf);
+    this.pos = 0;
+    this.objects = new Map();
+    this.classMeta = new Map();
+    this.libraries = new Map();
+    this.rootId = 0;
+    this.fieldOffsets = new Map(); // objectId -> { memberName -> byteOffset }
+  }
+  u8(){ return this.view.getUint8(this.pos++); }
+  i16(){ const v=this.view.getInt16(this.pos,true); this.pos+=2; return v; }
+  i32(){ const v=this.view.getInt32(this.pos,true); this.pos+=4; return v; }
+  u32(){ const v=this.view.getUint32(this.pos,true); this.pos+=4; return v; }
+  f32(){ const v=this.view.getFloat32(this.pos,true); this.pos+=4; return v; }
+  f64(){ const v=this.view.getFloat64(this.pos,true); this.pos+=8; return v; }
+  i64(){
+    const lo=this.u32(), hi=this.i32();
+    return BigInt(hi)*(1n<<32n)+BigInt(lo);
+  }
+  str(){
+    let len=0,shift=0;
+    while(true){
+      const b=this.u8();
+      len |= (b & 0x7f) << shift;
+      if(!(b & 0x80)) break;
+      shift += 7;
+      if(shift > 35) throw new Error('LPS too big');
+    }
+    const bytes = new Uint8Array(this.view.buffer, this.view.byteOffset + this.pos, len);
+    this.pos += len;
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+  readHeader(){
+    const rt = this.u8();
+    if(rt !== 0) throw new Error('Not NRBF (record type '+rt+')');
+    this.rootId = this.i32();
+    this.i32();
+    const major = this.i32(), minor = this.i32();
+    if(major !== 1) console.warn('NRBF version', major, minor);
+  }
+  readPrimitive(t){
+    switch(t){
+      case 1: return this.u8() !== 0;
+      case 2: return this.u8();
+      case 6: return this.f64();
+      case 7: return this.i16();
+      case 8: return this.i32();
+      case 9: return this.i64();
+      case 11: return this.f32();
+      case 18: return this.str();
+      default: throw new Error('Unsupported primitive type '+t);
+    }
+  }
+  readAddInfo(bt){
+    switch(bt){
+      case 0: return this.u8();
+      case 1: return null;
+      case 2: return null;
+      case 3: return this.str();
+      case 4: return { name: this.str(), libraryId: this.i32() };
+      case 5: return null;
+      case 6: return null;
+      case 7: return this.u8();
+      default: throw new Error('Unsupported binary type '+bt);
+    }
+  }
+  readMemberValueWithOffset(bt, ai){
+    if(bt === 0){
+      const offset = this.pos;
+      const value = this.readPrimitive(ai);
+      return { value, offset };
+    }
+    return { value: this.readRecord(), offset: null };
+  }
+  readRecord(){
+    const rt = this.u8();
+    switch(rt){
+      case 1:  return this.readClassWithId();
+      case 4:  return this.readClassWithMembersAndTypes(true);
+      case 5:  return this.readClassWithMembersAndTypes(false);
+      case 6:  return this.readBinaryObjectString();
+      case 7:  return this.readBinaryArray();
+      case 8:  return this.readMemberPrimitiveTyped();
+      case 9:  return this.readMemberReference();
+      case 10: return null;
+      case 11: throw new Error('__MSG_END__');
+      case 12: this.readBinaryLibrary(); return this.readRecord();
+      case 15: return this.readArraySinglePrimitive();
+      case 16: return this.readArraySingleObject();
+      case 17: return this.readArraySingleString();
+      default: throw new Error('Unknown record type: '+rt);
+    }
+  }
+  readBinaryLibrary(){
+    const id = this.i32(), name = this.str();
+    this.libraries.set(id, name);
+  }
+  readClassWithMembersAndTypes(isSystem){
+    const oid = this.i32();
+    const className = this.str();
+    const mc = this.i32();
+    const names = []; for(let i=0;i<mc;i++) names.push(this.str());
+    const bts = []; for(let i=0;i<mc;i++) bts.push(this.u8());
+    const ais = []; for(let i=0;i<mc;i++) ais.push(this.readAddInfo(bts[i]));
+    const libId = isSystem ? 0 : this.i32();
+    const obj = { _id: oid, _class: className };
+    this.objects.set(oid, obj);
+    this.classMeta.set(oid, { className, names, bts, ais, libId });
+    const offsets = {};
+    for(let i=0;i<mc;i++){
+      const r = this.readMemberValueWithOffset(bts[i], ais[i]);
+      obj[names[i]] = r.value;
+      if(r.offset !== null) offsets[names[i]] = r.offset;
+    }
+    if(Object.keys(offsets).length) this.fieldOffsets.set(oid, offsets);
+    return obj;
+  }
+  readClassWithId(){
+    const oid = this.i32(), metaId = this.i32();
+    const meta = this.classMeta.get(metaId);
+    if(!meta) throw new Error('Unknown metadataId '+metaId);
+    const obj = { _id: oid, _class: meta.className };
+    this.objects.set(oid, obj);
+    const offsets = {};
+    for(let i=0;i<meta.names.length;i++){
+      const r = this.readMemberValueWithOffset(meta.bts[i], meta.ais[i]);
+      obj[meta.names[i]] = r.value;
+      if(r.offset !== null) offsets[meta.names[i]] = r.offset;
+    }
+    if(Object.keys(offsets).length) this.fieldOffsets.set(oid, offsets);
+    return obj;
+  }
+  readBinaryObjectString(){
+    const id = this.i32();
+    // LPS全体の開始位置を記録（length prefix から）
+    const lpsStart = this.pos;
+    const v = this.str();
+    const lpsEnd = this.pos;
+    // 文字列 → バイト範囲の情報を記録
+    if(!this.stringRanges) this.stringRanges = new Map();
+    this.stringRanges.set(id, { lpsStart, lpsEnd, value: v });
+    this.objects.set(id, v);
+    return v;
+  }
+  readMemberReference(){
+    return { __ref: this.i32() };
+  }
+  readMemberPrimitiveTyped(){
+    const t = this.u8();
+    return this.readPrimitive(t);
+  }
+  readArraySingleObject(){
+    const id = this.i32();
+    const lengthOffset = this.pos;
+    const len = this.i32();
+    const arr = [];
+    arr.__lengthOffset = lengthOffset;  // 配列長のバイトオフセットを記録
+    arr.__id = id;
+    this.objects.set(id, arr);
+    let i = 0;
+    const startReadPos = this.pos;
+    while(i < len){
+      const v = this.readRecord();
+      if(Array.isArray(v) && v.__nulls){
+        for(let k=0;k<v.length && i<len;k++,i++) arr.push(null);
+      } else { arr.push(v); i++; }
+    }
+    arr.__endOffset = this.pos;  // 配列全体の終了位置
+    return arr;
+  }
+  readArraySinglePrimitive(){
+    const id = this.i32(), len = this.i32(), t = this.u8();
+    const arr = [];
+    this.objects.set(id, arr);
+    for(let i=0;i<len;i++) arr.push(this.readPrimitive(t));
+    return arr;
+  }
+  readArraySingleString(){
+    const id = this.i32(), len = this.i32();
+    const arr = [];
+    this.objects.set(id, arr);
+    for(let i=0;i<len;i++){
+      const r = this.readRecord();
+      if(Array.isArray(r) && r.__nulls){
+        for(let k=0;k<r.length;k++) arr.push(null);
+      } else arr.push(r);
+    }
+    return arr;
+  }
+  readBinaryArray(){
+    const id = this.i32();
+    const bat = this.u8();
+    const rank = this.i32();
+    let lengthOffset = -1;
+    const lengths = [];
+    for(let i=0;i<rank;i++){
+      if(i === 0) lengthOffset = this.pos;
+      lengths.push(this.i32());
+    }
+    if(bat === 3 || bat === 4 || bat === 5){
+      for(let i=0;i<rank;i++) this.i32();
+    }
+    const et = this.u8();
+    const ai = this.readAddInfo(et);
+    const total = lengths.reduce((a,b)=>a*b, 1);
+    const arr = [];
+    arr.__lengthOffset = lengthOffset;
+    arr.__id = id;
+    this.objects.set(id, arr);
+    let i = 0;
+    while(i < total){
+      if(et === 0) { arr.push(this.readPrimitive(ai)); i++; continue; }
+      const v = this.readRecord();
+      if(Array.isArray(v) && v.__nulls){
+        for(let k=0;k<v.length && i<total;k++,i++) arr.push(null);
+      } else { arr.push(v); i++; }
+    }
+    arr.__endOffset = this.pos;
+    return arr;
+  }
+  parse(){
+    this.readHeader();
+    try {
+      while(true) this.readRecord();
+    } catch(e) {
+      if(e.message !== '__MSG_END__') throw e;
+    }
+    return this.resolve(this.objects.get(this.rootId));
+  }
+  resolve(o, seen = new Map()){
+    if(o === null || o === undefined) return o;
+    if(typeof o !== 'object') return o;
+    if(seen.has(o)) return seen.get(o);
+    if(o.__ref !== undefined && Object.keys(o).length === 1){
+      const t = this.objects.get(o.__ref);
+      if(t === undefined) return null;
+      return this.resolve(t, seen);
+    }
+    if(Array.isArray(o)){
+      const r = []; seen.set(o, r);
+      for(const it of o) r.push(this.resolve(it, seen));
+      if(o.__lengthOffset !== undefined) r.__lengthOffset = o.__lengthOffset;
+      if(o.__endOffset !== undefined) r.__endOffset = o.__endOffset;
+      if(o.__id !== undefined) r.__id = o.__id;
+      return r;
+    }
+    const r = {}; seen.set(o, r);
+    for(const k of Object.keys(o)) r[k] = this.resolve(o[k], seen);
+    return r;
+  }
+  // Get the value offset for a member of a resolved object
+  getValueOffset(resolvedObj, memberName) {
+    if(!resolvedObj || resolvedObj._id === undefined) return null;
+    const map = this.fieldOffsets.get(resolvedObj._id);
+    return map ? map[memberName] : null;
+  }
+  // Get the offset of ANY primitive field on the resolved KeyValuePair (key or value)
+  getFieldOffset(resolvedObj, memberName) {
+    return this.getValueOffset(resolvedObj, memberName);
+  }
+  // 文字列の位置情報を取得（プレハブ名差し替え用）
+  // 引数: resolvedObj は WeaponisedAnimalPrefab、memberName は 'prefabName'
+  // 戻り値: { lpsStart, lpsEnd } 文字列LPS全体のバイト範囲
+  getStringRange(resolvedObj, memberName){
+    if(!resolvedObj || resolvedObj._id === undefined) return null;
+    const valueRef = resolvedObj[memberName];
+    if(typeof valueRef !== 'string') return null;
+    // BinaryObjectString の オブジェクトIDを stringRanges から逆引き
+    if(!this.stringRanges) return null;
+    for(const [id, info] of this.stringRanges){
+      if(info.value === valueRef) return { lpsStart: info.lpsStart, lpsEnd: info.lpsEnd };
+    }
+    return null;
+  }
+}
+
+/* ============================================================
+   LPS (Length Prefix String) エンコード／文字列差し替え
+   ============================================================ */
+function encodeLPS(str){
+  const utf8 = new TextEncoder().encode(str);
+  const len = utf8.length;
+  const prefix = [];
+  let l = len;
+  while(l >= 0x80){
+    prefix.push((l & 0x7f) | 0x80);
+    l >>>= 7;
+  }
+  prefix.push(l);
+  const out = new Uint8Array(prefix.length + utf8.length);
+  out.set(prefix, 0);
+  out.set(utf8, prefix.length);
+  return out;
+}
+
+// 既存バイトの「lpsStart〜lpsEnd」を新しい文字列 newStr に差し替える
+// 戻り値: 新しい Uint8Array（ファイルサイズが変わる可能性あり）
+function replaceString(originalBytes, lpsStart, lpsEnd, newStr){
+  const newLps = encodeLPS(newStr);
+  const before = originalBytes.subarray(0, lpsStart);
+  const after = originalBytes.subarray(lpsEnd);
+  const out = new Uint8Array(before.length + newLps.length + after.length);
+  out.set(before, 0);
+  out.set(newLps, before.length);
+  out.set(after, before.length + newLps.length);
+  return out;
+}
+
+/* ============================================================
+   props辞書に新規エントリを追加
+   配列の末尾に ClassWithId 形式の KeyValuePair を挿入する
+   ============================================================ */
+// 引数:
+//   originalBytes: 元のファイル
+//   pairsArr: NRBFパーサーが返した KeyValuePairs 配列（__lengthOffset, __endOffset を持つ）
+//   metadataId: 既存のKeyValuePair クラス定義の objectId（参照用）
+//   newId: 新しい objectId
+//   newKey, newValue: 追加する key, value (int32)
+function appendKeyValuePair(originalBytes, lengthOffset, endOffset, metadataId, newId, newKey, newValue){
+  // ClassWithId バイト構成（13 bytes）:
+  //   rt=1 (1byte) + objectId (4 bytes) + metadataId (4 bytes) + key (4 bytes) + value (4 bytes)
+  const entry = new Uint8Array(17);
+  const dv = new DataView(entry.buffer);
+  entry[0] = 1;  // ClassWithId
+  dv.setInt32(1, newId, true);
+  dv.setInt32(5, metadataId, true);
+  dv.setInt32(9, newKey, true);
+  dv.setInt32(13, newValue, true);
+
+  // 既存バイトの endOffset 位置に entry を挿入
+  const before = originalBytes.subarray(0, endOffset);
+  const after = originalBytes.subarray(endOffset);
+  const out = new Uint8Array(before.length + entry.length + after.length);
+  out.set(before, 0);
+  out.set(entry, before.length);
+  out.set(after, before.length + entry.length);
+
+  // 配列 length を +1（lengthOffset 位置の i32 を読み出して+1して書く）
+  const oldLen = new DataView(out.buffer).getInt32(lengthOffset, true);
+  new DataView(out.buffer).setInt32(lengthOffset, oldLen + 1, true);
+  return { bytes: out, addedAt: endOffset, newEndOffset: endOffset + 17 };
+}
+
+/* ============================================================
+   Prefab Map
+   ============================================================ */
+let PREFAB_MAP = null;
+let PREFAB_JA = null;
+let MAPS_PROMISE = null;
+function loadMap(){
+  if(!MAPS_PROMISE){
+    MAPS_PROMISE = Promise.all([
+      fetch('./prefab_map.json?v=4').then(r => r.ok ? r.json() : {}),
+      fetch('./prefab_ja.json?v=4').then(r => r.ok ? r.json() : {})
+    ]).then(([m, ja]) => {
+      PREFAB_MAP = m; PREFAB_JA = ja;
+      return { m, ja };
+    }).catch(e => {
+      console.error('Failed to load maps', e);
+      MAPS_PROMISE = null;
+      return { m: {}, ja: {} };
+    });
+  }
+  return MAPS_PROMISE;
+}
+loadMap();
+
+function lookup(id){
+  const sid = String(id);
+  // 1. WEAPON_NAMES_JA を最優先（ユーザー提供の正式名）
+  if(WEAPON_NAMES_JA[id]){
+    const entry = PREFAB_MAP ? PREFAB_MAP[sid] : null;
+    return { n: WEAPON_NAMES_JA[id], en: entry?.n || null, c: entry?.c || 'Unit Creator' };
+  }
+  if(!PREFAB_MAP) return { n: 'ID '+id, c: 'Unknown', en: null };
+  const entry = PREFAB_MAP[sid];
+  if(!entry) return { n: 'unknown('+id+')', c: 'UnknownPart', en: null };
+  const ja = PREFAB_JA?.[sid];
+  return { n: ja || entry.n, en: ja ? entry.n : null, c: entry.c };
+}
+
+/* ============================================================
+   Extract WeaponisedAnimalPrefab into analyzed summary
+   ============================================================ */
+function analyze(parsed, reader){
+  if(!parsed || parsed._class !== 'WeaponisedAnimalPrefab'){
+    throw new Error('Not a WeaponisedAnimalPrefab (root class: ' + (parsed?._class || 'unknown') + ')');
+  }
+  const name = parsed.prefabName;
+  const rec = parsed.animalRecord;
+  if(!rec || !rec._class || !rec._class.includes('MapUnitRecord')){
+    throw new Error('animalRecord missing or invalid');
+  }
+
+  // Build prop list with offsets
+  // rec.props.KeyValuePairs is array of KeyValuePair objects (resolved)
+  const pairsRaw = rec.props?.KeyValuePairs;
+  if(!Array.isArray(pairsRaw)) throw new Error('props.KeyValuePairs missing');
+
+  // Map: propKey -> { value, offset (for value), keyOffset (for key), pairObj }
+  const propMap = new Map();
+  for(const p of pairsRaw){
+    if(p && p.key !== undefined && p.value !== undefined){
+      const offset = reader.getValueOffset(p, 'value');
+      const keyOffset = reader.getFieldOffset(p, 'key');
+      propMap.set(p.key, { value: p.value, offset, keyOffset, pairObj: p });
+    }
+  }
+
+  const getProp = (k, def) => propMap.has(k) ? propMap.get(k).value : def;
+  const baseIdx = rec.unitPrefabIndex;
+  const baseInfo = lookup(baseIdx);
+  const hp = getProp(2, 100) / 100;
+  const dmg = getProp(3, 100) / 100;
+  const scale = getProp(4, 100000) / 100000;
+  const ai = getProp(0, 0);
+  const detect = getProp(1, 100);
+  const team = rec.team ?? 0;
+  // 編集用オフセット情報（HP/DMGの value のバイト位置）
+  const hpOffset = propMap.get(2)?.offset ?? null;
+  const hpRaw = propMap.get(2)?.value ?? 100;
+  const dmgOffset = propMap.get(3)?.offset ?? null;
+  const dmgRaw = propMap.get(3)?.value ?? 100;
+  // プレハブ名のバイト範囲
+  const prefabNameRange = reader.getStringRange(parsed, 'prefabName');
+
+  // weapons: each block of 11 props starting at 100
+  const weapons = [];
+  let i = 100;
+  while(propMap.has(i)){
+    const wIdx = propMap.get(i).value;
+    const scaleP = propMap.get(i+1);
+    const dmgP   = propMap.get(i+2);
+    const parentP = propMap.get(i+10);
+    const rawDmg = dmgP?.value ?? 0;
+    const dmgFloat = rawDmg / 100000;
+    // 11個の key offsets を集める（key=i, i+1, ..., i+10）
+    const keyOffsets = [];
+    for(let k = 0; k < 11; k++){
+      const p = propMap.get(i + k);
+      keyOffsets.push(p?.keyOffset ?? null);
+    }
+    const wPropP = propMap.get(i);
+    weapons.push({
+      idx: wIdx,
+      scale: (scaleP?.value ?? 0) / 100000,
+      dmgRaw: rawDmg,
+      dmgOffset: dmgP?.offset ?? null,
+      prefabIdxOffset: wPropP?.offset ?? null,        // 色変更用：prefabIndex の value offset
+      dmg: dmgFloat,
+      parent: parentP?.value ?? 0,
+      blockStart: i,
+      keyOffsets,
+      isWeapon: WEAPON_IDS.has(wIdx)
+    });
+    i += 11;
+  }
+  // aggregate by (idx, scale, dmg)
+  const agg = new Map();
+  for(const w of weapons){
+    const key = w.idx + '|' + w.scale.toFixed(4) + '|' + w.dmg.toFixed(4);
+    if(!agg.has(key)){
+      const info = lookup(w.idx);
+      agg.set(key, {
+        idx: w.idx, scale: w.scale, dmg: w.dmg, dmgRaw: w.dmgRaw,
+        count: 0, instances: [], name: info.n, nameEn: info.en, category: info.c, isWeapon: w.isWeapon
+      });
+    }
+    const g = agg.get(key);
+    g.count++;
+    g.instances.push(w);
+  }
+  const list = Array.from(agg.values()).sort((a,b)=>{
+    if(a.isWeapon !== b.isWeapon) return a.isWeapon ? -1 : 1;
+    return b.count - a.count;
+  });
+  const weaponOnlyCount = weapons.filter(w => w.isWeapon).length;
+
+  // バリエーション変換可能ブロックの集計（色違い + 番号違い）
+  const colorBlocks = {};
+  for(const w of weapons){
+    const grp = PREFAB_ID_TO_GROUP[w.idx];
+    if(!grp) continue;
+    const {groupKey, label} = grp;
+    const ginfo = VARIANT_GROUPS[groupKey];
+    if(!ginfo) continue;
+    if(!colorBlocks[groupKey]){
+      colorBlocks[groupKey] = {
+        groupKey,
+        displayName: ginfo.displayName,
+        type: ginfo.type,                              // 'color' or 'number'
+        availableColors: ginfo.options,                // {label: prefabId}
+        countByColor: {},
+        instances: []
+      };
+    }
+    colorBlocks[groupKey].countByColor[label] = (colorBlocks[groupKey].countByColor[label] || 0) + 1;
+    colorBlocks[groupKey].instances.push(w);
+  }
+  const weaponOnlyKinds = list.filter(g => g.isWeapon).length;
+
+  // props辞書のメタ情報（新規prop追加用）
+  // 新規 objectId は「既存IDの最小値 - 1」から始める（負方向に拡張）
+  // → BinaryFormatter の内部 ID 連番予測と衝突しない安全な範囲
+  let minId = 0;
+  for(const p of pairsRaw){
+    if(p && p._id !== undefined && p._id < minId) minId = p._id;
+  }
+  const pairsMeta = {
+    lengthOffset: pairsRaw.__lengthOffset,
+    endOffset: pairsRaw.__endOffset,
+    metadataId: pairsRaw[0]?._id,
+    nextNewId: minId - 1   // -1487 のような未使用領域から開始
+  };
+
+  return {
+    name, baseIdx, baseInfo,
+    hp, dmg, scale, ai, detect, team,
+    hpOffset, hpRaw,
+    dmgOffset, dmgRaw,
+    prefabNameRange,
+    pairsMeta,                   // props新規追加用メタ
+    weaponCount: weapons.length,
+    uniqueWeapons: list.length,
+    weaponOnlyCount, weaponOnlyKinds,
+    weapons: list,
+    allWeaponBlocks: weapons,
+    colorBlocks
+  };
+}
+
+/* ============================================================
+   Apply edits and produce modified bytes
+   ============================================================ */
+function applyEdits(originalBytes, edits){
+  // edits: array of { offset, newRawValue (int32) }
+  const copy = new Uint8Array(originalBytes);
+  const view = new DataView(copy.buffer);
+  for(const e of edits){
+    if(e.offset == null) continue;
+    view.setInt32(e.offset, e.newRawValue, true);
+  }
+  return copy;
+}
+
+/* 削除と並べ替えのロジックを計算する：
+   allWeaponBlocks（順序通り）と deletedSet（削除対象の blockStart）から、
+   key の書き換え計画を作る。
+   - 残るブロックは順番に i=100, 111, 122... に再配置
+   - 削除対象は key を 999000+元番号 のような未使用領域に追放
+*/
+function computeRearrangeEdits(allWeaponBlocks, deletedSet){
+  const edits = []; // {offset, newRawValue}
+  let newIndex = 100;
+  for(const block of allWeaponBlocks){
+    const isDeleted = deletedSet.has(block.blockStart);
+    if(isDeleted){
+      // 削除：keyを999000+元番号 のような未使用領域に書き換え
+      // （ARBSのループからは見えなくなる）
+      for(let k = 0; k < 11; k++){
+        const off = block.keyOffsets[k];
+        if(off == null) continue;
+        edits.push({ offset: off, newRawValue: 990000 + block.blockStart + k });
+      }
+    } else {
+      // 残す：newIndex に再配置（i=100, 111, 122...）
+      for(let k = 0; k < 11; k++){
+        const off = block.keyOffsets[k];
+        if(off == null) continue;
+        const newKey = newIndex + k;
+        edits.push({ offset: off, newRawValue: newKey });
+      }
+      newIndex += 11;
+    }
+  }
+  return edits;
+}
+
+/* ==================   Rendering & State
+   ============================================================ */
+const state = { items: [], sort: 'name', showAll: false };
+
+function render(){
+  const results = document.getElementById('results');
+  const empty = document.getElementById('empty');
+  const tb = document.getElementById('toolbar');
+  results.innerHTML = '';
+
+  if(state.items.length === 0){
+    empty.style.display = '';
+    tb.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  tb.style.display = '';
+
+  const items = [...state.items];
+  if(state.sort === 'weapons') items.sort((a,b)=> (b.summary?.weaponOnlyCount ?? -1) - (a.summary?.weaponOnlyCount ?? -1));
+  else if(state.sort === 'hp') items.sort((a,b)=> (b.summary?.hp ?? -1) - (a.summary?.hp ?? -1));
+  else if(state.sort === 'dmg') items.sort((a,b)=> (b.summary?.dmg ?? -1) - (a.summary?.dmg ?? -1));
+  else items.sort((a,b)=> (a.summary?.name || a.filename).localeCompare(b.summary?.name || b.filename));
+
+  document.getElementById('count').textContent = state.items.length + ' files loaded';
+
+  for(const it of items){
+    results.appendChild(renderItem(it));
+  }
+}
+
+function renderItem(it){
+  const div = document.createElement('div');
+  div.className = 'result' + (it.error ? ' error' : '') + (it.modified ? ' modified' : '');
+  div.setAttribute('data-result-id', it.id);
+
+  if(it.error){
+    div.innerHTML = '<div class="result-head"><div><div class="label">FILE</div><div class="name">'+escapeHTML(it.filename)+'</div></div><div style="grid-column:2/-1;color:var(--red);font-size:13px">'+escapeHTML(it.error)+'</div></div>';
+    return div;
+  }
+
+  const s = it.summary;
+  const head = document.createElement('div');
+  head.className = 'result-head';
+  const modFlag = it.modified ? '<span class="mod-flag">MODIFIED</span>' : '';
+  const thumbHtml = it.imageDataUrl
+    ? '<div class="thumb"><img src="'+it.imageDataUrl+'" alt="prefab thumbnail"/></div>'
+    : '<div class="thumb"><div class="no-img">📦</div></div>';
+  head.innerHTML =
+    thumbHtml +
+    '<div><div class="label">PREFAB NAME</div><div class="name">'+escapeHTML(s.name || it.filename)+modFlag+'</div></div>' +
+    '<div><div class="label">BASE UNIT</div><div class="val">'+escapeHTML(s.baseInfo.n)+' <span style="color:var(--text-muted);font-size:11px">#'+s.baseIdx+'</span></div></div>' +
+    '<div><div class="label">HP MULTI</div><div class="val hp">'+fmt(s.hp)+'×</div></div>' +
+    '<div><div class="label">DMG MULTI</div><div class="val dmg">'+fmt(s.dmg)+'×</div></div>' +
+    '<div><div class="label">WEAPONS</div><div class="val weapons">'+s.weaponOnlyCount+' <span style="color:var(--text-muted);font-size:11px">/ all '+s.weaponCount+'</span></div></div>' +
+    '<div class="toggle">▶</div>';
+  head.addEventListener('click', ()=>{ div.classList.toggle('open'); });
+  div.appendChild(head);
+
+  const body = document.createElement('div');
+  body.className = 'result-body';
+  // ベース基本情報の編集セクション
+  const curName = it.newPrefabName !== undefined ? it.newPrefabName : s.name;
+  const curHp = it.newHpRaw !== undefined ? (it.newHpRaw / 100) : s.hp;
+  const curDmg = it.newDmgRaw !== undefined ? (it.newDmgRaw / 100) : s.dmg;
+  body.innerHTML =
+    '<div class="base-edit">' +
+      '<div class="base-edit-row">' +
+        '<label class="base-edit-field"><span>プレハブ名（漢字・ひらがな・スペースOK）</span>' +
+        '<input type="text" class="prefab-name-input" data-item-id="'+it.id+'" value="'+escapeHTML(curName)+'" maxlength="100"/></label>' +
+      '</div>' +
+      '<div class="base-edit-row">' +
+        '<label class="base-edit-field-small"><span>ベースHP倍率</span>' +
+        '<input type="number" step="0.1" min="0" class="base-hp-input" data-item-id="'+it.id+'" value="'+fmt(curHp)+'"/><span class="suffix">×</span></label>' +
+        '<label class="base-edit-field-small"><span>ベース攻撃倍率</span>' +
+        '<input type="number" step="0.1" min="0" class="base-dmg-input" data-item-id="'+it.id+'" value="'+fmt(curDmg)+'"/><span class="suffix">×</span></label>' +
+      '</div>' +
+    '</div>' +
+    (s.colorBlocks && Object.keys(s.colorBlocks).length > 0 ? renderColorBlocksSection(it, s.colorBlocks) : '') +
+    '<div class="meta-row">' +
+      '<span><b>ベースID:</b>'+s.baseIdx+'</span>' +
+      '<span><b>Scale:</b>'+fmt(s.scale)+'×</span>' +
+      '<span><b>AI override:</b>'+s.ai+'</span>' +
+      '<span><b>Detection:</b>'+s.detect+'m</span>' +
+      '<span><b>Team:</b>'+s.team+'</span>' +
+    '</div>';
+  // 入力イベントを設定
+  setTimeout(()=>{
+    const ne = body.querySelector('.prefab-name-input');
+    if(ne) ne.addEventListener('input', onPrefabNameInput);
+    const he = body.querySelector('.base-hp-input');
+    if(he) he.addEventListener('input', onBaseHpInput);
+    const de = body.querySelector('.base-dmg-input');
+    if(de) de.addEventListener('input', onBaseDmgInput);
+    // 色変更セレクト
+    body.querySelectorAll('.cb-select').forEach(el => {
+      el.addEventListener('change', onColorChange);
+      if(el.tagName === 'INPUT') el.addEventListener('input', onColorChange);
+    });
+    body.querySelectorAll('[data-action="color-del"]').forEach(el => el.addEventListener('click', onColorDelete));
+  }, 0);
+
+  const bodyTb = document.createElement('div');
+  bodyTb.className = 'body-toolbar';
+  const dlDisabled = it.modified ? '' : 'disabled';
+  const infoText = it.modified
+    ? ((it.edits && it.edits.size ? it.edits.size + ' 武器の倍率変更' : '') +
+       (it.edits && it.edits.size && it.deleted && it.deleted.size ? ' / ' : '') +
+       (it.deleted && it.deleted.size ? it.deleted.size + ' 武器を削除' : ''))
+    : '変更なし';
+  bodyTb.innerHTML =
+    '<span class="quick-set">武器全体に一括 DMG倍率: <input type="number" class="quick-input" step="0.1" placeholder="例: 5" id="qi-'+it.id+'"/></span>' +
+    '<button type="button" data-action="apply-quick">一括適用</button>' +
+    '<button type="button" data-action="reset">リセット</button>' +
+    '<span class="info" id="info-'+it.id+'">'+infoText+'</span>' +
+    '<button type="button" class="primary" data-action="download" id="dl-'+it.id+'" '+dlDisabled+'>変更ファイルをダウンロード</button>';
+  body.appendChild(bodyTb);
+
+  const weaponsToShow = state.showAll ? s.weapons : s.weapons.filter(w => w.isWeapon);
+
+  if(weaponsToShow.length === 0){
+    const msg = document.createElement('div');
+    msg.style.cssText = 'color:var(--text-muted);padding:12px 0';
+    msg.textContent = state.showAll ? '装着パーツなし' : '攻撃可能な武器なし（装飾パーツのみ）';
+    body.appendChild(msg);
+  } else {
+    const tbl = document.createElement('table');
+    tbl.className = 'weapons';
+    tbl.innerHTML =
+      '<thead><tr>' +
+      '<th>カテゴリ</th><th>パーツ名</th><th class="num">ID</th>' +
+      '<th class="num">スケール</th><th class="num">DMG倍率（編集可）</th>' +
+      '<th class="num">個数</th><th class="num">削除</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    weaponsToShow.forEach(w => {
+      const tr = document.createElement('tr');
+      const groupIdx = s.weapons.indexOf(w);
+      const allDeleted = w.instances.every(inst => it.deleted && it.deleted.has(inst.blockStart));
+      if(!w.isWeapon) tr.className = 'non-weapon';
+      if(allDeleted) tr.classList.add('deleted');
+      const catClass = w.category.replace(/\s+/g, '');
+      const nameHtml = escapeHTML(w.name) +
+        (w.nameEn ? '<span class="part-name-en">' + escapeHTML(w.nameEn) + '</span>' : '');
+      tr.innerHTML =
+        '<td><span class="cat '+catClass+'">'+escapeHTML(w.category)+'</span></td>' +
+        '<td>'+nameHtml+'</td>' +
+        '<td class="num">'+w.idx+'</td>' +
+        '<td class="num">'+fmt(w.scale)+'×</td>' +
+        '<td class="num"></td>' +
+        '<td class="num count">×'+w.count+'</td>' +
+        '<td class="num"></td>';
+      const dmgCell = tr.children[4];
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.step = '0.1';
+      input.className = 'dmg-input';
+      input.value = fmt(w.dmg);
+      input.dataset.itemId = it.id;
+      input.dataset.groupIdx = String(groupIdx);
+      input.disabled = !w.isWeapon || allDeleted;
+      input.addEventListener('input', onDmgInput);
+      dmgCell.appendChild(input);
+      // 削除/復元ボタン
+      const delCell = tr.children[6];
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'del-btn' + (allDeleted ? ' undo' : '');
+      delBtn.textContent = allDeleted ? '復元' : '削除';
+      delBtn.dataset.itemId = it.id;
+      delBtn.dataset.groupIdx = String(groupIdx);
+      delBtn.addEventListener('click', onDeleteToggle);
+      delCell.appendChild(delBtn);
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    body.appendChild(tbl);
+  }
+
+  bodyTb.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const action = btn.dataset.action;
+    if(action === 'apply-quick'){
+      const qi = document.getElementById('qi-'+it.id);
+      const v = parseFloat(qi.value);
+      if(!isFinite(v) || v < 0){ alert('正しい数値を入力してください'); return; }
+      const inputs = body.querySelectorAll('.dmg-input:not(:disabled)');
+      inputs.forEach(inp => {
+        inp.value = fmt(v);
+        onDmgInput({ target: inp });
+      });
+    } else if(action === 'reset'){
+      it.edits = new Map();
+      it.deleted = new Set();
+      delete it.newPrefabName;
+      delete it.newHpRaw;
+      delete it.newDmgRaw;
+      delete it.colorChanges;
+      it.modified = false;
+      render();
+    } else if(action === 'download'){
+      downloadModified(it);
+    }
+  });
+
+  div.appendChild(body);
+  return div;
+}
+
+function onDmgInput(e){
+  const inp = e.target;
+  const itemId = inp.dataset.itemId;
+  const gIdx = parseInt(inp.dataset.groupIdx, 10);
+  const item = state.items.find(x => x.id === itemId);
+  if(!item) return;
+  const group = item.summary.weapons[gIdx];
+  if(!group) return;
+
+  const newDmg = parseFloat(inp.value);
+  if(!isFinite(newDmg) || newDmg < 0){ inp.classList.add('changed'); return; }
+  const newRaw = Math.round(newDmg * 100000);
+  const isChanged = newRaw !== group.dmgRaw;
+  inp.classList.toggle('changed', isChanged);
+  if(!item.edits) item.edits = new Map();
+  if(isChanged){
+    for(const inst of group.instances){
+      item.edits.set(inst.blockStart + 2, { offset: inst.dmgOffset, newRawValue: newRaw });
+    }
+  } else {
+    for(const inst of group.instances){
+      item.edits.delete(inst.blockStart + 2);
+    }
+  }
+  updateModifiedState(item);
+}
+
+function onPrefabNameInput(e){
+  const inp = e.target;
+  const item = state.items.find(x => x.id === inp.dataset.itemId);
+  if(!item) return;
+  const orig = item.summary.name;
+  const v = inp.value;
+  if(v !== orig){
+    item.newPrefabName = v;
+    inp.classList.add('changed');
+  } else {
+    delete item.newPrefabName;
+    inp.classList.remove('changed');
+  }
+  updateModifiedState(item);
+}
+
+function onBaseHpInput(e){
+  const inp = e.target;
+  const item = state.items.find(x => x.id === inp.dataset.itemId);
+  if(!item) return;
+  const v = parseFloat(inp.value);
+  if(!isFinite(v) || v < 0){ inp.classList.add('changed'); return; }
+  const newRaw = Math.round(v * 100);
+  if(newRaw !== item.summary.hpRaw){
+    item.newHpRaw = newRaw;
+    inp.classList.add('changed');
+  } else {
+    delete item.newHpRaw;
+    inp.classList.remove('changed');
+  }
+  updateModifiedState(item);
+}
+
+function onBaseDmgInput(e){
+  const inp = e.target;
+  const item = state.items.find(x => x.id === inp.dataset.itemId);
+  if(!item) return;
+  const v = parseFloat(inp.value);
+  if(!isFinite(v) || v < 0){ inp.classList.add('changed'); return; }
+  const newRaw = Math.round(v * 100);
+  if(newRaw !== item.summary.dmgRaw){
+    item.newDmgRaw = newRaw;
+    inp.classList.add('changed');
+  } else {
+    delete item.newDmgRaw;
+    inp.classList.remove('changed');
+  }
+  updateModifiedState(item);
+}
+
+function onColorChange(e){
+  const item = state.items.find(x => x.id === e.target.dataset.itemId);
+  if(!item) return;
+  const gkey = e.target.dataset.gkey;
+  const curColor = e.target.dataset.current;
+  const newLabel = (e.target.value || '').trim();
+  if(!item.colorChanges) item.colorChanges = {};
+  if(!item.colorChanges[gkey]) item.colorChanges[gkey] = {};
+  const cb = item.summary.colorBlocks && item.summary.colorBlocks[gkey];
+  if(newLabel && cb && cb.availableColors[newLabel] !== undefined){
+    item.colorChanges[gkey][curColor] = newLabel;
+  } else {
+    delete item.colorChanges[gkey][curColor];
+  }
+  if(Object.keys(item.colorChanges[gkey]).length === 0) delete item.colorChanges[gkey];
+  if(Object.keys(item.colorChanges).length === 0) delete item.colorChanges;
+  updateModifiedState(item);
+}
+
+function onColorDelete(e){
+  const btn = e.currentTarget;
+  const item = state.items.find(x => x.id === btn.dataset.itemId);
+  if(!item) return;
+  const gkey = btn.dataset.gkey;
+  const curColor = btn.dataset.current;
+  const cb = item.summary.colorBlocks && item.summary.colorBlocks[gkey];
+  if(!cb) return;
+  // この色を持つ全 instance の blockStart を deleted トグル
+  if(!item.deleted) item.deleted = new Set();
+  const targetInstances = cb.instances.filter(inst => {
+    const grp = PREFAB_ID_TO_GROUP[inst.idx];
+    return grp && grp.label === curColor;
+  });
+  const allCurrentlyDeleted = targetInstances.every(inst => item.deleted.has(inst.blockStart));
+  if(allCurrentlyDeleted){
+    for(const inst of targetInstances) item.deleted.delete(inst.blockStart);
+  } else {
+    for(const inst of targetInstances) item.deleted.add(inst.blockStart);
+  }
+  updateModifiedState(item);
+  // 再レンダー（開いた状態を維持）
+  const openIds = new Set();
+  document.querySelectorAll('.result.open').forEach(el => openIds.add(el.getAttribute('data-result-id')));
+  const scrollY = window.scrollY;
+  render();
+  document.querySelectorAll('.result').forEach(el => {
+    if(openIds.has(el.getAttribute('data-result-id'))) el.classList.add('open');
+  });
+  window.scrollTo(0, scrollY);
+}
+
+
+function onDeleteToggle(e){
+  e.preventDefault();
+  e.stopPropagation();
+  const btn = e.currentTarget;
+  const itemId = btn.dataset.itemId;
+  const gIdx = parseInt(btn.dataset.groupIdx, 10);
+  const item = state.items.find(x => x.id === itemId);
+  if(!item) return;
+  const group = item.summary.weapons[gIdx];
+  if(!group) return;
+  if(!item.deleted) item.deleted = new Set();
+  const allCurrentlyDeleted = group.instances.every(inst => item.deleted.has(inst.blockStart));
+  if(allCurrentlyDeleted){
+    for(const inst of group.instances) item.deleted.delete(inst.blockStart);
+  } else {
+    for(const inst of group.instances) item.deleted.add(inst.blockStart);
+  }
+  updateModifiedState(item);
+  const openIds = new Set();
+  document.querySelectorAll('.result.open').forEach(el => openIds.add(el.getAttribute('data-result-id')));
+  const scrollY = window.scrollY;
+  render();
+  document.querySelectorAll('.result').forEach(el => {
+    if(openIds.has(el.getAttribute('data-result-id'))){
+      el.classList.add('open');
+    }
+  });
+  window.scrollTo(0, scrollY);
+}
+
+function renderColorBlocksSection(item, colorBlocks){
+  const sortedEntries = Object.entries(colorBlocks).sort((a, b) => {
+    const ta = a[1].type, tb = b[1].type;
+    if(ta !== tb) return ta === 'color' ? -1 : 1;
+    return b[1].instances.length - a[1].instances.length;
+  });
+  const rows = sortedEntries.map(([gkey, cb]) => {
+    const opts = Object.keys(cb.availableColors);
+    const currentMap = (item.colorChanges && item.colorChanges[gkey]) || {};
+    // 現在使用中の色ごとにグループ化
+    const insByColor = {};
+    for(const inst of cb.instances){
+      const grpInfo = PREFAB_ID_TO_GROUP[inst.idx];
+      if(!grpInfo) continue;
+      const col = grpInfo.label;
+      if(!insByColor[col]) insByColor[col] = [];
+      insByColor[col].push(inst);
+    }
+    const deletedSet = item.deleted || new Set();
+    const subRows = Object.entries(insByColor).map(([curColor, list]) => {
+      const total = list.length;
+      const aliveCount = list.filter(inst => !deletedSet.has(inst.blockStart)).length;
+      const allDeleted = aliveCount === 0;
+      const hex = COLOR_HEX[curColor] || '#888';
+      const sel = currentMap[curColor] || '';
+      const optionTags = ['<option value="">変更なし</option>'].concat(
+        opts.map(label => {
+          if(label === curColor) return '';
+          const s = sel === label ? ' selected' : '';
+          return '<option value="'+label+'"'+s+'>'+label+'</option>';
+        })
+      ).join('');
+      const icon = cb.type === 'color' ? '<span class="color-chip-small" style="background:'+hex+'"></span>' : '<span class="num-chip-small">#'+curColor+'</span>';
+      const countStr = allDeleted ? ('<s>×'+total+'</s>') : ('×'+aliveCount+(aliveCount<total?' /'+total:''));
+      const delBtnLabel = allDeleted ? '復元' : '削除';
+      const delBtnClass = allDeleted ? 'del-btn undo' : 'del-btn';
+      const rowCls = allDeleted ? 'cb-pair deleted-row' : 'cb-pair';
+      return '<div class="'+rowCls+'">' +
+        '<span class="cb-curr">'+icon+' '+escapeHTML(curColor)+' '+countStr+'</span>' +
+        '<span class="cb-arrow">→</span>' +
+        '<select class="cb-select" data-item-id="'+item.id+'" data-gkey="'+escapeHTML(gkey)+'" data-current="'+escapeHTML(curColor)+'"'+(allDeleted?' disabled':'')+'>'+optionTags+'</select>' +
+        '<button type="button" class="'+delBtnClass+'" data-item-id="'+item.id+'" data-gkey="'+escapeHTML(gkey)+'" data-current="'+escapeHTML(curColor)+'" data-action="color-del">'+delBtnLabel+'</button>' +
+      '</div>';
+    }).join('');
+    const icon = cb.type === 'color' ? '🎨' : '🔢';
+    const catTag = cb.category ? '<span class="cb-cat">['+escapeHTML(cb.category)+']</span>' : '';
+    return '<tr>' +
+      '<td class="cb-name">'+icon+' '+escapeHTML(cb.displayName)+' '+catTag+'</td>' +
+      '<td class="cb-pairs">'+subRows+'</td>' +
+      '</tr>';
+  }).join('');
+  return '<div class="color-block-section">' +
+    '<div class="cb-header">🎨 バリエーション変換可能ブロック <span class="cb-count">('+Object.keys(colorBlocks).length+'種類)</span><span class="cb-hint">— 色ごとに変換／削除できます</span></div>' +
+    '<table class="color-blocks"><thead><tr>' +
+      '<th>ブロックの形</th><th>現在使用中 → 新しい色 / 削除</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>' +
+  '</div>';
+}
+
+function updateModifiedState(item){
+  const hasEdits = item.edits && item.edits.size > 0;
+  const hasDeletions = item.deleted && item.deleted.size > 0;
+  const hasNameChange = item.newPrefabName !== undefined;
+  const hasHpChange = item.newHpRaw !== undefined;
+  const hasDmgChange = item.newDmgRaw !== undefined;
+  const hasColorChange = item.colorChanges && Object.keys(item.colorChanges).length > 0;
+  item.modified = hasEdits || hasDeletions || hasNameChange || hasHpChange || hasDmgChange || hasColorChange;
+  const result = document.querySelector('[data-result-id="'+item.id+'"]');
+  if(result) result.classList.toggle('modified', item.modified);
+  const dl = document.getElementById('dl-'+item.id);
+  const info = document.getElementById('info-'+item.id);
+  if(dl) dl.disabled = !item.modified;
+  if(info){
+    const parts = [];
+    if(item.newPrefabName !== undefined) parts.push('名前変更');
+    if(item.newHpRaw !== undefined) parts.push('HP変更');
+    if(item.newDmgRaw !== undefined) parts.push('攻撃倍率変更');
+    if(item.edits && item.edits.size) parts.push(item.edits.size + ' 武器の倍率変更');
+    if(item.deleted && item.deleted.size) parts.push(item.deleted.size + ' 武器を削除');
+    if(item.colorChanges){
+      let totalPairs = 0;
+      for(const m of Object.values(item.colorChanges)) totalPairs += Object.keys(m).length;
+      if(totalPairs > 0) parts.push(totalPairs + ' 件の色変更');
+    }
+    info.textContent = parts.length ? parts.join(' / ') : '変更なし';
+  }
+}
+
+function downloadModified(item){
+  if(!item.modified) return;
+  const deletedSet = item.deleted || new Set();
+  const allBlocks = item.summary.allWeaponBlocks || [];
+  const rearrangeEdits = (deletedSet.size > 0)
+    ? computeRearrangeEdits(allBlocks, deletedSet)
+    : [];
+  const dmgEdits = [];
+  if(item.edits){
+    for(const [blockKey, e] of item.edits){
+      const blockStart = blockKey - 2;
+      if(deletedSet.has(blockStart)) continue;
+      dmgEdits.push(e);
+    }
+  }
+  const baseEdits = [];
+  if(item.newHpRaw !== undefined && item.summary.hpOffset != null){
+    baseEdits.push({ offset: item.summary.hpOffset, newRawValue: item.newHpRaw });
+  }
+  if(item.newDmgRaw !== undefined && item.summary.dmgOffset != null){
+    baseEdits.push({ offset: item.summary.dmgOffset, newRawValue: item.newDmgRaw });
+  }
+  // バリエーション変更：item.colorChanges = {gkey: {currentColor: newColor}} を prefabIdxEdits に変換
+  const colorEdits = [];
+  if(item.colorChanges && item.summary.colorBlocks){
+    for(const [gkey, curToNewMap] of Object.entries(item.colorChanges)){
+      const cb = item.summary.colorBlocks[gkey];
+      if(!cb) continue;
+      for(const inst of cb.instances){
+        if(inst.prefabIdxOffset == null) continue;
+        if(deletedSet.has(inst.blockStart)) continue;
+        // この inst の現在色を逆引き
+        const grpInfo = PREFAB_ID_TO_GROUP[inst.idx];
+        if(!grpInfo) continue;
+        const curColor = grpInfo.label;
+        const newColor = curToNewMap[curColor];
+        if(!newColor) continue;
+        const newId = cb.availableColors[newColor];
+        if(!newId) continue;
+        colorEdits.push({ offset: inst.prefabIdxOffset, newRawValue: newId });
+      }
+    }
+  }
+  let modified = applyEdits(item.originalBytes, [...rearrangeEdits, ...dmgEdits, ...baseEdits, ...colorEdits]);
+
+  if(item.newPrefabName !== undefined && item.summary.prefabNameRange){
+    const { lpsStart, lpsEnd } = item.summary.prefabNameRange;
+    modified = replaceString(modified, lpsStart, lpsEnd, item.newPrefabName);
+  }
+
+  const blob = new Blob([modified], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  let outName = item.filename;
+  if(item.newPrefabName !== undefined){
+    const safeName = item.newPrefabName.replace(/[\\/:*?"<>|]/g, '_');
+    outName = item.filename.replace(/^(WEP_ANIM_PREF_)[^_]*(_\d{4})/, (_, p, suffix) => p + safeName + suffix);
+  }
+  a.href = url;
+  a.download = outName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=> URL.revokeObjectURL(url), 1000);
+  if(item.imageBytes){
+    setTimeout(()=> downloadImageFor(item), 800);
+  }
+}
+
+function downloadImageFor(item){
+  if(!item.imageBytes) return;
+  let imgName = item.imageFile.name;
+  if(item.newPrefabName !== undefined){
+    const safeName = item.newPrefabName.replace(/[\\/:*?"<>|]/g, '_');
+    imgName = item.imageFile.name.replace(/^(WEP_ANIM_PREF_)[^_]*(_\d{4})/, (_, p, suffix) => p + safeName + suffix);
+  }
+  const ext = (item.imageExt || '.jpg').toLowerCase();
+  const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
+  const blob = new Blob([item.imageBytes], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = imgName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=> URL.revokeObjectURL(url), 1000);
+}
+
+function fmt(v){
+  if(v === Math.round(v)) return v.toString();
+  return parseFloat(v.toFixed(4)).toString();
+}
+function escapeHTML(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+let nextItemId = 1;
+function fileToDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+async function handleFiles(fileList){
+  await loadMap();
+  const prefabFiles = [];
+  const imageMap = new Map();
+  for(const f of fileList){
+    const lower = f.name.toLowerCase();
+    if(/-imeg\.(jpe?g|png)$/i.test(lower)){
+      const baseName = f.name.replace(/-IMEG\.(jpe?g|png)$/i, '');
+      imageMap.set(baseName, f);
+    } else if(lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png')){
+      continue;
+    } else {
+      prefabFiles.push(f);
+    }
+  }
+  for(const f of prefabFiles){
+    const id = 'it'+(nextItemId++);
+    const item = {
+      id, filename: f.name,
+      edits: new Map(), deleted: new Set(), hidden: new Set(), modified: false,
+      imageFile: null, imageBytes: null, imageDataUrl: null, imageExt: null
+    };
+    state.items.push(item);
+    try {
+      const buf = await f.arrayBuffer();
+      item.originalBytes = new Uint8Array(buf).slice();
+      const reader = new NRBFReader(buf);
+      const parsed = reader.parse();
+      item.summary = analyze(parsed, reader);
+      const pairImg = imageMap.get(f.name);
+      if(pairImg){
+        item.imageFile = pairImg;
+        const imgBuf = await pairImg.arrayBuffer();
+        item.imageBytes = new Uint8Array(imgBuf);
+        item.imageDataUrl = await fileToDataUrl(pairImg);
+        const m = pairImg.name.match(/-IMEG(\.\w+)$/i);
+        item.imageExt = m ? m[1] : '.jpg';
+        imageMap.delete(f.name);
+      }
+    } catch(e){
+      item.error = e.message;
+      console.error(f.name, e);
+    }
+  }
+  render();
+}
+
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+drop.addEventListener('click', e => {
+  if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+  fileInput.click();
+});
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+drop.addEventListener('dragenter', e => { e.preventDefault(); e.stopPropagation(); drop.classList.add('dragover'); });
+drop.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); drop.classList.add('dragover'); });
+drop.addEventListener('dragleave', e => { e.preventDefault(); e.stopPropagation(); drop.classList.remove('dragover'); });
+drop.addEventListener('drop', e => {
+  e.preventDefault();
+  e.stopPropagation();
+  drop.classList.remove('dragover');
+  if(e.dataTransfer && e.dataTransfer.files){
+    handleFiles(e.dataTransfer.files);
+  }
+});
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+
+document.getElementById('expandAll').addEventListener('click', ()=>{
+  document.querySelectorAll('.result').forEach(el=>el.classList.add('open'));
+});
+document.getElementById('collapseAll').addEventListener('click', ()=>{
+  document.querySelectorAll('.result').forEach(el=>el.classList.remove('open'));
+});
+document.getElementById('clear').addEventListener('click', ()=>{
+  state.items = []; render();
+});
+document.getElementById('sort').addEventListener('change', e=>{
+  state.sort = e.target.value; render();
+});
+document.getElementById('showAll').addEventListener('change', e=>{
+  state.showAll = e.target.checked; render();
+});
+
+render();
+</script>
+
+</body>
+</html>
