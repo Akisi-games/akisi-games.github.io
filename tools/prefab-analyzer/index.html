@@ -210,6 +210,62 @@ table.weapons .part-name-en { color: var(--text-muted); font-size: 11px; margin-
 }
 
 footer { padding: 32px; text-align: center; color: var(--text-muted); font-size: 12px; border-top: 1px solid var(--border); margin-top: 64px; }
+
+/* 色変更可能ブロック セクション */
+.color-block-section {
+  margin: 16px 24px;
+  padding: 12px 16px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.color-block-section .cb-header {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+.color-block-section .cb-count {
+  color: var(--text-soft);
+  font-weight: 400;
+  font-size: 12px;
+  margin-left: 6px;
+}
+table.color-blocks { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.color-blocks th {
+  text-align: left;
+  padding: 6px 8px;
+  background: var(--bg-card);
+  color: var(--text-soft);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+table.color-blocks td { padding: 8px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+table.color-blocks td.cb-name { font-weight: 600; color: var(--text); }
+.color-chip {
+  display: inline-block;
+  min-width: 28px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  margin-right: 4px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.cb-select {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cb-select:hover { border-color: var(--cyan); }
 </style>
 </head>
 <body>
@@ -264,6 +320,177 @@ footer { padding: 32px; text-align: center; color: var(--text-muted); font-size:
 /* ============================================================
    武器ID＆正式名マップ（ユーザー提供：ARBSメニュー121件）
    ============================================================ */
+// === 色変更可能ブロックのマッピング（13形）===
+const COLOR_GROUPS = {
+  "TransferGate": {
+    "displayName": "トランスファーゲート",
+    "colors": {
+      "Red": 1385,
+      "Blue": 1386,
+      "Yellow": 1387
+    }
+  },
+  "PlasmaBeam": {
+    "displayName": "プラズマビーム",
+    "colors": {
+      "Blue": 4281,
+      "Red": 4282,
+      "Yellow": 4283,
+      "Purple": 4284,
+      "Green": 4285
+    }
+  },
+  "TRexPlasmaBeamHead": {
+    "displayName": "TRexプラズマビーム頭",
+    "colors": {
+      "Blue": 4286,
+      "Red": 4287,
+      "Yellow": 4288,
+      "Purple": 4289,
+      "Green": 4290
+    }
+  },
+  "Eye": {
+    "displayName": "目",
+    "colors": {
+      "Blue": 4302,
+      "Green": 4303,
+      "Red": 4304,
+      "White": 4306,
+      "Yellow": 4307
+    }
+  },
+  "Embers": {
+    "displayName": "残り火",
+    "colors": {
+      "Blue": 4308,
+      "Green": 4309,
+      "Purple": 4310,
+      "Red": 4311,
+      "White": 4312,
+      "Yellow": 4313
+    }
+  },
+  "Embers2": {
+    "displayName": "残り火2",
+    "colors": {
+      "Blue": 4314,
+      "Green": 4315,
+      "Purple": 4316,
+      "Red": 4317,
+      "White": 4318,
+      "Yellow": 4319
+    }
+  },
+  "1": {
+    "displayName": "ピクセルブロック 1",
+    "colors": {
+      "Black": 4368,
+      "Green": 4404,
+      "Blue": 4440,
+      "Orange": 4476,
+      "Pink": 4512,
+      "Red": 4548,
+      "Silver": 4584
+    }
+  },
+  "2": {
+    "displayName": "ピクセルブロック 2",
+    "colors": {
+      "Black": 4369,
+      "Green": 4405,
+      "Blue": 4441,
+      "Orange": 4477,
+      "Pink": 4513,
+      "Red": 4549,
+      "Silver": 4585
+    }
+  },
+  "3": {
+    "displayName": "ピクセルブロック 3",
+    "colors": {
+      "Black": 4370,
+      "Green": 4406,
+      "Blue": 4442,
+      "Orange": 4478,
+      "Pink": 4514,
+      "Red": 4550,
+      "Silver": 4586
+    }
+  },
+  "4": {
+    "displayName": "ピクセルブロック 4",
+    "colors": {
+      "Black": 4371,
+      "Green": 4407,
+      "Blue": 4443,
+      "Orange": 4479,
+      "Pink": 4515,
+      "Red": 4551,
+      "Silver": 4587
+    }
+  },
+  "5": {
+    "displayName": "ピクセルブロック 5",
+    "colors": {
+      "Black": 4372,
+      "Green": 4408,
+      "Blue": 4444,
+      "Orange": 4480,
+      "Pink": 4516,
+      "Red": 4552,
+      "Silver": 4588
+    }
+  },
+  "MotionFlame": {
+    "displayName": "モーション炎",
+    "colors": {
+      "Red": 4620,
+      "Blue": 4621,
+      "Green": 4622,
+      "Yellow": 4623,
+      "Pink": 4624
+    }
+  },
+  "Flame": {
+    "displayName": "炎",
+    "colors": {
+      "Red": 4625,
+      "Blue": 4626,
+      "Green": 4627,
+      "Yellow": 4628,
+      "Pink": 4629
+    }
+  }
+};
+
+const COLOR_HEX = {
+  "Red": "#e74c3c",
+  "Blue": "#3498db",
+  "Green": "#2ecc71",
+  "Yellow": "#f1c40f",
+  "Black": "#2c3e50",
+  "White": "#ecf0f1",
+  "Gray": "#95a5a6",
+  "Grey": "#95a5a6",
+  "Pink": "#fd79a8",
+  "Orange": "#e67e22",
+  "Purple": "#9b59b6",
+  "Brown": "#a0522d",
+  "Cyan": "#1abc9c",
+  "Magenta": "#e91e63",
+  "Gold": "#d4af37",
+  "Silver": "#bdc3c7"
+};
+
+// 逆引きテーブル：prefabIndex から {base, color} を取得
+const PREFAB_ID_TO_GROUP = {};
+for(const [base, info] of Object.entries(COLOR_GROUPS)){
+  for(const [color, id] of Object.entries(info.colors)){
+    PREFAB_ID_TO_GROUP[id] = {base, color};
+  }
+}
+
 const WEAPON_NAMES_JA = {
   4000:"ピアサー",4001:"ダイナマイト",4002:"マシンガン",4003:"ミサイルランチャー",
   4004:"鋼の触手",4005:"もり",4006:"スパイク(スピア)",
@@ -753,17 +980,17 @@ function analyze(parsed, reader){
       const p = propMap.get(i + k);
       keyOffsets.push(p?.keyOffset ?? null);
     }
+    const wPropP = propMap.get(i);
     weapons.push({
       idx: wIdx,
       scale: (scaleP?.value ?? 0) / 100000,
       dmgRaw: rawDmg,
       dmgOffset: dmgP?.offset ?? null,
+      prefabIdxOffset: wPropP?.offset ?? null,        // 色変更用：prefabIndex の value offset
       dmg: dmgFloat,
       parent: parentP?.value ?? 0,
       blockStart: i,
-      keyOffsets,                                     // 11個の key の byte offset
-      // 武器判定: WEAPON_NAMES_JA に登録されたIDのみ表示
-      // → フィラーウェポン、装飾、未知パーツは自動的に非表示
+      keyOffsets,
       isWeapon: WEAPON_IDS.has(wIdx)
     });
     i += 11;
@@ -788,6 +1015,25 @@ function analyze(parsed, reader){
     return b.count - a.count;
   });
   const weaponOnlyCount = weapons.filter(w => w.isWeapon).length;
+
+  // 色変更可能ブロックの集計
+  const colorBlocks = {};
+  for(const w of weapons){
+    const grp = PREFAB_ID_TO_GROUP[w.idx];
+    if(!grp) continue;
+    const {base, color} = grp;
+    if(!colorBlocks[base]){
+      colorBlocks[base] = {
+        base,
+        displayName: COLOR_GROUPS[base].displayName,
+        availableColors: COLOR_GROUPS[base].colors,  // {color: prefabId}
+        countByColor: {},
+        instances: []
+      };
+    }
+    colorBlocks[base].countByColor[color] = (colorBlocks[base].countByColor[color] || 0) + 1;
+    colorBlocks[base].instances.push(w);
+  }
   const weaponOnlyKinds = list.filter(g => g.isWeapon).length;
 
   // props辞書のメタ情報（新規prop追加用）
@@ -815,7 +1061,8 @@ function analyze(parsed, reader){
     uniqueWeapons: list.length,
     weaponOnlyCount, weaponOnlyKinds,
     weapons: list,
-    allWeaponBlocks: weapons
+    allWeaponBlocks: weapons,
+    colorBlocks
   };
 }
 
@@ -944,6 +1191,7 @@ function renderItem(it){
         '<input type="number" step="0.1" min="0" class="base-dmg-input" data-item-id="'+it.id+'" value="'+fmt(curDmg)+'"/><span class="suffix">×</span></label>' +
       '</div>' +
     '</div>' +
+    (s.colorBlocks && Object.keys(s.colorBlocks).length > 0 ? renderColorBlocksSection(it, s.colorBlocks) : '') +
     '<div class="meta-row">' +
       '<span><b>ベースID:</b>'+s.baseIdx+'</span>' +
       '<span><b>Scale:</b>'+fmt(s.scale)+'×</span>' +
@@ -959,6 +1207,8 @@ function renderItem(it){
     if(he) he.addEventListener('input', onBaseHpInput);
     const de = body.querySelector('.base-dmg-input');
     if(de) de.addEventListener('input', onBaseDmgInput);
+    // 色変更セレクト
+    body.querySelectorAll('.cb-select').forEach(el => el.addEventListener('change', onColorChange));
   }, 0);
 
   const bodyTb = document.createElement('div');
@@ -1056,6 +1306,7 @@ function renderItem(it){
       delete it.newPrefabName;
       delete it.newHpRaw;
       delete it.newDmgRaw;
+      delete it.colorChanges;
       it.modified = false;
       render();
     } else if(action === 'download'){
@@ -1144,6 +1395,21 @@ function onBaseDmgInput(e){
   updateModifiedState(item);
 }
 
+function onColorChange(e){
+  const item = state.items.find(x => x.id === e.target.dataset.itemId);
+  if(!item) return;
+  const base = e.target.dataset.base;
+  const newColor = e.target.value;
+  if(!item.colorChanges) item.colorChanges = {};
+  if(newColor){
+    item.colorChanges[base] = newColor;
+  } else {
+    delete item.colorChanges[base];
+  }
+  if(Object.keys(item.colorChanges).length === 0) delete item.colorChanges;
+  updateModifiedState(item);
+}
+
 
 function onDeleteToggle(e){
   e.preventDefault();
@@ -1175,13 +1441,43 @@ function onDeleteToggle(e){
   window.scrollTo(0, scrollY);
 }
 
+function renderColorBlocksSection(item, colorBlocks){
+  const rows = Object.values(colorBlocks).map(cb => {
+    // 現在の色の表示（複数あるならカンマ区切り）
+    const currentChips = Object.entries(cb.countByColor).map(([color, count]) => {
+      const hex = COLOR_HEX[color] || '#888';
+      return '<span class="color-chip" style="background:'+hex+'" title="'+color+' × '+count+'">'+count+'</span>';
+    }).join('');
+    // ドロップダウン用オプション
+    const currentSel = (item.colorChanges && item.colorChanges[cb.base]) || '';
+    const options = ['<option value="">変更なし</option>'].concat(
+      Object.keys(cb.availableColors).map(color => {
+        const sel = currentSel === color ? ' selected' : '';
+        return '<option value="'+color+'"'+sel+'>'+color+'</option>';
+      })
+    ).join('');
+    return '<tr>' +
+      '<td class="cb-name">🎨 '+escapeHTML(cb.displayName)+'</td>' +
+      '<td class="cb-current">'+currentChips+'</td>' +
+      '<td><select class="cb-select" data-item-id="'+item.id+'" data-base="'+escapeHTML(cb.base)+'">'+options+'</select></td>' +
+      '</tr>';
+  }).join('');
+  return '<div class="color-block-section">' +
+    '<div class="cb-header">🎨 色変更可能ブロック <span class="cb-count">('+Object.keys(colorBlocks).length+'種類)</span></div>' +
+    '<table class="color-blocks"><thead><tr>' +
+      '<th>ブロックの形</th><th>現在使用中</th><th>一括で色変更</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>' +
+  '</div>';
+}
+
 function updateModifiedState(item){
   const hasEdits = item.edits && item.edits.size > 0;
   const hasDeletions = item.deleted && item.deleted.size > 0;
   const hasNameChange = item.newPrefabName !== undefined;
   const hasHpChange = item.newHpRaw !== undefined;
   const hasDmgChange = item.newDmgRaw !== undefined;
-  item.modified = hasEdits || hasDeletions || hasNameChange || hasHpChange || hasDmgChange;
+  const hasColorChange = item.colorChanges && Object.keys(item.colorChanges).length > 0;
+  item.modified = hasEdits || hasDeletions || hasNameChange || hasHpChange || hasDmgChange || hasColorChange;
   const result = document.querySelector('[data-result-id="'+item.id+'"]');
   if(result) result.classList.toggle('modified', item.modified);
   const dl = document.getElementById('dl-'+item.id);
@@ -1194,6 +1490,7 @@ function updateModifiedState(item){
     if(item.newDmgRaw !== undefined) parts.push('攻撃倍率変更');
     if(item.edits && item.edits.size) parts.push(item.edits.size + ' 武器の倍率変更');
     if(item.deleted && item.deleted.size) parts.push(item.deleted.size + ' 武器を削除');
+    if(item.colorChanges && Object.keys(item.colorChanges).length) parts.push(Object.keys(item.colorChanges).length + ' 種類の色変更');
     info.textContent = parts.length ? parts.join(' / ') : '変更なし';
   }
 }
@@ -1220,7 +1517,22 @@ function downloadModified(item){
   if(item.newDmgRaw !== undefined && item.summary.dmgOffset != null){
     baseEdits.push({ offset: item.summary.dmgOffset, newRawValue: item.newDmgRaw });
   }
-  let modified = applyEdits(item.originalBytes, [...rearrangeEdits, ...dmgEdits, ...baseEdits]);
+  // 色変更：item.colorChanges を prefabIdxEdits に変換
+  const colorEdits = [];
+  if(item.colorChanges && item.summary.colorBlocks){
+    for(const [base, newColor] of Object.entries(item.colorChanges)){
+      const cb = item.summary.colorBlocks[base];
+      if(!cb) continue;
+      const newId = cb.availableColors[newColor];
+      if(!newId) continue;
+      for(const inst of cb.instances){
+        if(inst.prefabIdxOffset == null) continue;
+        if(deletedSet.has(inst.blockStart)) continue;
+        colorEdits.push({ offset: inst.prefabIdxOffset, newRawValue: newId });
+      }
+    }
+  }
+  let modified = applyEdits(item.originalBytes, [...rearrangeEdits, ...dmgEdits, ...baseEdits, ...colorEdits]);
 
   if(item.newPrefabName !== undefined && item.summary.prefabNameRange){
     const { lpsStart, lpsEnd } = item.summary.prefabNameRange;
