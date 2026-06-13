@@ -273,6 +273,52 @@ table.color-blocks td.cb-name { font-weight: 600; color: var(--text); }
   font-weight: 400;
   margin-left: 4px;
 }
+.cb-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border-soft);
+}
+.cb-pair:last-child { border-bottom: none; }
+.cb-curr {
+  min-width: 110px;
+  font-weight: 600;
+  color: var(--text);
+}
+.color-chip-small {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-right: 4px;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.num-chip-small {
+  display: inline-block;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 10px;
+  margin-right: 4px;
+}
+.cb-arrow { color: var(--text-muted); font-weight: 700; }
+.cb-cat {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  margin-left: 6px;
+}
+.cb-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 8px;
+}
+table.color-blocks td.cb-pairs { padding: 4px 8px; }
+
 input.cb-select {
   background: var(--bg-card);
   color: var(--text);
@@ -1910,15 +1956,17 @@ function onColorChange(e){
   const item = state.items.find(x => x.id === e.target.dataset.itemId);
   if(!item) return;
   const gkey = e.target.dataset.gkey;
+  const curColor = e.target.dataset.current;
   const newLabel = (e.target.value || '').trim();
   if(!item.colorChanges) item.colorChanges = {};
-  // 値が有効か確認（VARIANT_GROUPS にあるか）
+  if(!item.colorChanges[gkey]) item.colorChanges[gkey] = {};
   const cb = item.summary.colorBlocks && item.summary.colorBlocks[gkey];
   if(newLabel && cb && cb.availableColors[newLabel] !== undefined){
-    item.colorChanges[gkey] = newLabel;
+    item.colorChanges[gkey][curColor] = newLabel;
   } else {
-    delete item.colorChanges[gkey];
+    delete item.colorChanges[gkey][curColor];
   }
+  if(Object.keys(item.colorChanges[gkey]).length === 0) delete item.colorChanges[gkey];
   if(Object.keys(item.colorChanges).length === 0) delete item.colorChanges;
   updateModifiedState(item);
 }
@@ -1962,50 +2010,37 @@ function renderColorBlocksSection(item, colorBlocks){
     return b[1].instances.length - a[1].instances.length;
   });
   const rows = sortedEntries.map(([gkey, cb]) => {
-    // 現在使用中の表示
-    let currentChips = '';
-    if(cb.type === 'color'){
-      currentChips = Object.entries(cb.countByColor).map(([color, count]) => {
-        const hex = COLOR_HEX[color] || '#888';
-        return '<span class="color-chip" style="background:'+hex+'" title="'+color+' × '+count+'">'+count+'</span>';
-      }).join('');
-    } else {
-      // 番号 series: 番号と件数を並べる
-      currentChips = Object.entries(cb.countByColor).map(([num, count]) => {
-        return '<span class="num-chip" title="番号 '+num+' × '+count+'">#'+num+' × '+count+'</span>';
-      }).join(' ');
-    }
-    // ドロップダウン
-    const currentSel = (item.colorChanges && item.colorChanges[gkey]) || '';
+    // 使用中の各色について「現在の色 → 新しい色」 のセレクトを並べる
     const opts = Object.keys(cb.availableColors);
-    const labelText = cb.type === 'color' ? '色' : '番号';
-    let selectHtml;
-    if(opts.length <= 60){
+    const currentMap = (item.colorChanges && item.colorChanges[gkey]) || {};
+    const subRows = Object.entries(cb.countByColor).map(([curColor, count]) => {
+      const hex = COLOR_HEX[curColor] || '#888';
+      const sel = currentMap[curColor] || '';
       const optionTags = ['<option value="">変更なし</option>'].concat(
         opts.map(label => {
-          const sel = currentSel === label ? ' selected' : '';
-          return '<option value="'+label+'"'+sel+'>'+label+'</option>';
+          if(label === curColor) return ''; // 同じ色は除外
+          const s = sel === label ? ' selected' : '';
+          return '<option value="'+label+'"'+s+'>'+label+'</option>';
         })
       ).join('');
-      selectHtml = '<select class="cb-select" data-item-id="'+item.id+'" data-gkey="'+escapeHTML(gkey)+'">'+optionTags+'</select>';
-    } else {
-      // > 60件は datalist 形式（オートコンプリート入力）
-      const dlId = 'dl_'+item.id+'_'+gkey.replace(/[^a-zA-Z0-9]/g,'');
-      const dlOpts = opts.map(label => '<option value="'+label+'">').join('');
-      selectHtml = '<input class="cb-select" list="'+dlId+'" data-item-id="'+item.id+'" data-gkey="'+escapeHTML(gkey)+'" value="'+escapeHTML(currentSel)+'" placeholder="番号入力 (例: '+opts[0]+')" />'+
-        '<datalist id="'+dlId+'">'+dlOpts+'</datalist>';
-    }
+      const icon = cb.type === 'color' ? '<span class="color-chip-small" style="background:'+hex+'"></span>' : '<span class="num-chip-small">#'+curColor+'</span>';
+      return '<div class="cb-pair">' +
+        '<span class="cb-curr">'+icon+' '+curColor+' × '+count+'</span>' +
+        '<span class="cb-arrow">→</span>' +
+        '<select class="cb-select" data-item-id="'+item.id+'" data-gkey="'+escapeHTML(gkey)+'" data-current="'+escapeHTML(curColor)+'">'+optionTags+'</select>' +
+      '</div>';
+    }).join('');
     const icon = cb.type === 'color' ? '🎨' : '🔢';
+    const catTag = cb.category ? '<span class="cb-cat">['+escapeHTML(cb.category)+']</span>' : '';
     return '<tr>' +
-      '<td class="cb-name">'+icon+' '+escapeHTML(cb.displayName)+' <span class="cb-meta">('+labelText+' '+opts.length+'種)</span></td>' +
-      '<td class="cb-current">'+currentChips+'</td>' +
-      '<td>'+selectHtml+'</td>' +
+      '<td class="cb-name">'+icon+' '+escapeHTML(cb.displayName)+' '+catTag+'</td>' +
+      '<td class="cb-pairs">'+subRows+'</td>' +
       '</tr>';
   }).join('');
   return '<div class="color-block-section">' +
-    '<div class="cb-header">🎨 バリエーション変換可能ブロック <span class="cb-count">('+Object.keys(colorBlocks).length+'種類)</span></div>' +
+    '<div class="cb-header">🎨 バリエーション変換可能ブロック <span class="cb-count">('+Object.keys(colorBlocks).length+'種類)</span><span class="cb-hint">— 使用中の色ごとに新しい色へ変換できます</span></div>' +
     '<table class="color-blocks"><thead><tr>' +
-      '<th>ブロックの形</th><th>現在使用中</th><th>一括で変更</th>' +
+      '<th>ブロックの形</th><th>現在使用中 → 新しい色</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table>' +
   '</div>';
 }
@@ -2030,7 +2065,11 @@ function updateModifiedState(item){
     if(item.newDmgRaw !== undefined) parts.push('攻撃倍率変更');
     if(item.edits && item.edits.size) parts.push(item.edits.size + ' 武器の倍率変更');
     if(item.deleted && item.deleted.size) parts.push(item.deleted.size + ' 武器を削除');
-    if(item.colorChanges && Object.keys(item.colorChanges).length) parts.push(Object.keys(item.colorChanges).length + ' 種類のバリエーション変更');
+    if(item.colorChanges){
+      let totalPairs = 0;
+      for(const m of Object.values(item.colorChanges)) totalPairs += Object.keys(m).length;
+      if(totalPairs > 0) parts.push(totalPairs + ' 件の色変更');
+    }
     info.textContent = parts.length ? parts.join(' / ') : '変更なし';
   }
 }
@@ -2057,17 +2096,23 @@ function downloadModified(item){
   if(item.newDmgRaw !== undefined && item.summary.dmgOffset != null){
     baseEdits.push({ offset: item.summary.dmgOffset, newRawValue: item.newDmgRaw });
   }
-  // バリエーション変更：item.colorChanges を prefabIdxEdits に変換
+  // バリエーション変更：item.colorChanges = {gkey: {currentColor: newColor}} を prefabIdxEdits に変換
   const colorEdits = [];
   if(item.colorChanges && item.summary.colorBlocks){
-    for(const [gkey, newLabel] of Object.entries(item.colorChanges)){
+    for(const [gkey, curToNewMap] of Object.entries(item.colorChanges)){
       const cb = item.summary.colorBlocks[gkey];
       if(!cb) continue;
-      const newId = cb.availableColors[newLabel];
-      if(!newId) continue;
       for(const inst of cb.instances){
         if(inst.prefabIdxOffset == null) continue;
         if(deletedSet.has(inst.blockStart)) continue;
+        // この inst の現在色を逆引き
+        const grpInfo = PREFAB_ID_TO_GROUP[inst.idx];
+        if(!grpInfo) continue;
+        const curColor = grpInfo.label;
+        const newColor = curToNewMap[curColor];
+        if(!newColor) continue;
+        const newId = cb.availableColors[newColor];
+        if(!newId) continue;
         colorEdits.push({ offset: inst.prefabIdxOffset, newRawValue: newId });
       }
     }
