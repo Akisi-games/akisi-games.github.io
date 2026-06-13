@@ -273,6 +273,22 @@ table.color-blocks td.cb-name { font-weight: 600; color: var(--text); }
   font-weight: 400;
   margin-left: 4px;
 }
+.cb-pair.deleted-row { opacity: 0.5; }
+.cb-pair.deleted-row .cb-curr { text-decoration: line-through; }
+.cb-pair .del-btn {
+  margin-left: 8px;
+  background: transparent;
+  color: var(--red);
+  border: 1px solid var(--red);
+  border-radius: 4px;
+  padding: 2px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.cb-pair .del-btn:hover { background: var(--red); color: #000; }
+.cb-pair .del-btn.undo { color: var(--cyan); border-color: var(--cyan); }
+.cb-pair .del-btn.undo:hover { background: var(--cyan); color: #000; }
 .cb-pair {
   display: flex;
   align-items: center;
@@ -1766,6 +1782,7 @@ function renderItem(it){
       el.addEventListener('change', onColorChange);
       if(el.tagName === 'INPUT') el.addEventListener('input', onColorChange);
     });
+    body.querySelectorAll('[data-action="color-del"]').forEach(el => el.addEventListener('click', onColorDelete));
   }, 0);
 
   const bodyTb = document.createElement('div');
@@ -1971,6 +1988,38 @@ function onColorChange(e){
   updateModifiedState(item);
 }
 
+function onColorDelete(e){
+  const btn = e.currentTarget;
+  const item = state.items.find(x => x.id === btn.dataset.itemId);
+  if(!item) return;
+  const gkey = btn.dataset.gkey;
+  const curColor = btn.dataset.current;
+  const cb = item.summary.colorBlocks && item.summary.colorBlocks[gkey];
+  if(!cb) return;
+  // この色を持つ全 instance の blockStart を deleted トグル
+  if(!item.deleted) item.deleted = new Set();
+  const targetInstances = cb.instances.filter(inst => {
+    const grp = PREFAB_ID_TO_GROUP[inst.idx];
+    return grp && grp.label === curColor;
+  });
+  const allCurrentlyDeleted = targetInstances.every(inst => item.deleted.has(inst.blockStart));
+  if(allCurrentlyDeleted){
+    for(const inst of targetInstances) item.deleted.delete(inst.blockStart);
+  } else {
+    for(const inst of targetInstances) item.deleted.add(inst.blockStart);
+  }
+  updateModifiedState(item);
+  // 再レンダー（開いた状態を維持）
+  const openIds = new Set();
+  document.querySelectorAll('.result.open').forEach(el => openIds.add(el.getAttribute('data-result-id')));
+  const scrollY = window.scrollY;
+  render();
+  document.querySelectorAll('.result').forEach(el => {
+    if(openIds.has(el.getAttribute('data-result-id'))) el.classList.add('open');
+  });
+  window.scrollTo(0, scrollY);
+}
+
 
 function onDeleteToggle(e){
   e.preventDefault();
@@ -2003,31 +2052,47 @@ function onDeleteToggle(e){
 }
 
 function renderColorBlocksSection(item, colorBlocks){
-  // ソート：色違い→番号違い順、 件数多い順
   const sortedEntries = Object.entries(colorBlocks).sort((a, b) => {
     const ta = a[1].type, tb = b[1].type;
     if(ta !== tb) return ta === 'color' ? -1 : 1;
     return b[1].instances.length - a[1].instances.length;
   });
   const rows = sortedEntries.map(([gkey, cb]) => {
-    // 使用中の各色について「現在の色 → 新しい色」 のセレクトを並べる
     const opts = Object.keys(cb.availableColors);
     const currentMap = (item.colorChanges && item.colorChanges[gkey]) || {};
-    const subRows = Object.entries(cb.countByColor).map(([curColor, count]) => {
+    // 現在使用中の色ごとにグループ化
+    const insByColor = {};
+    for(const inst of cb.instances){
+      const grpInfo = PREFAB_ID_TO_GROUP[inst.idx];
+      if(!grpInfo) continue;
+      const col = grpInfo.label;
+      if(!insByColor[col]) insByColor[col] = [];
+      insByColor[col].push(inst);
+    }
+    const deletedSet = item.deleted || new Set();
+    const subRows = Object.entries(insByColor).map(([curColor, list]) => {
+      const total = list.length;
+      const aliveCount = list.filter(inst => !deletedSet.has(inst.blockStart)).length;
+      const allDeleted = aliveCount === 0;
       const hex = COLOR_HEX[curColor] || '#888';
       const sel = currentMap[curColor] || '';
       const optionTags = ['<option value="">変更なし</option>'].concat(
         opts.map(label => {
-          if(label === curColor) return ''; // 同じ色は除外
+          if(label === curColor) return '';
           const s = sel === label ? ' selected' : '';
           return '<option value="'+label+'"'+s+'>'+label+'</option>';
         })
       ).join('');
       const icon = cb.type === 'color' ? '<span class="color-chip-small" style="background:'+hex+'"></span>' : '<span class="num-chip-small">#'+curColor+'</span>';
-      return '<div class="cb-pair">' +
-        '<span class="cb-curr">'+icon+' '+curColor+' × '+count+'</span>' +
+      const countStr = allDeleted ? ('<s>×'+total+'</s>') : ('×'+aliveCount+(aliveCount<total?' /'+total:''));
+      const delBtnLabel = allDeleted ? '復元' : '削除';
+      const delBtnClass = allDeleted ? 'del-btn undo' : 'del-btn';
+      const rowCls = allDeleted ? 'cb-pair deleted-row' : 'cb-pair';
+      return '<div class="'+rowCls+'">' +
+        '<span class="cb-curr">'+icon+' '+escapeHTML(curColor)+' '+countStr+'</span>' +
         '<span class="cb-arrow">→</span>' +
-        '<select class="cb-select" data-item-id="'+item.id+'" data-gkey="'+escapeHTML(gkey)+'" data-current="'+escapeHTML(curColor)+'">'+optionTags+'</select>' +
+        '<select class="cb-select" data-item-id="'+item.id+'" data-gkey="'+escapeHTML(gkey)+'" data-current="'+escapeHTML(curColor)+'"'+(allDeleted?' disabled':'')+'>'+optionTags+'</select>' +
+        '<button type="button" class="'+delBtnClass+'" data-item-id="'+item.id+'" data-gkey="'+escapeHTML(gkey)+'" data-current="'+escapeHTML(curColor)+'" data-action="color-del">'+delBtnLabel+'</button>' +
       '</div>';
     }).join('');
     const icon = cb.type === 'color' ? '🎨' : '🔢';
@@ -2038,9 +2103,9 @@ function renderColorBlocksSection(item, colorBlocks){
       '</tr>';
   }).join('');
   return '<div class="color-block-section">' +
-    '<div class="cb-header">🎨 バリエーション変換可能ブロック <span class="cb-count">('+Object.keys(colorBlocks).length+'種類)</span><span class="cb-hint">— 使用中の色ごとに新しい色へ変換できます</span></div>' +
+    '<div class="cb-header">🎨 バリエーション変換可能ブロック <span class="cb-count">('+Object.keys(colorBlocks).length+'種類)</span><span class="cb-hint">— 色ごとに変換／削除できます</span></div>' +
     '<table class="color-blocks"><thead><tr>' +
-      '<th>ブロックの形</th><th>現在使用中 → 新しい色</th>' +
+      '<th>ブロックの形</th><th>現在使用中 → 新しい色 / 削除</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table>' +
   '</div>';
 }
