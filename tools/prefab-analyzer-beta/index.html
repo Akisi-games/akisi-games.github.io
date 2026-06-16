@@ -2334,3 +2334,121 @@ render();
 
 </body>
 </html>
+<!-- =======================================================================
+  ARBS Prefab Analyzer — 左右反転(ミラー)アドオン
+  使い方: この <script> ブロックを index.html の </body> の直前に貼り付けるだけ。
+  既存コードは一切書き換えません。ページ内の NRBFReader / applyEdits /
+  replaceString / state をそのまま再利用します。
+  動作: 各プレハブカードの「変更ファイルをダウンロード」の隣に
+        「🔄 左右反転コピーを保存」ボタンを追加。押すと土台はそのままに
+        全パーツの localPos.x / 回転quat.y / 回転quat.z を符号反転した
+        コピー(別名「〜ミラー」)をダウンロードします。元ファイルは不変。
+  ======================================================================= -->
+<script>
+(function(){
+  'use strict';
+
+  // item.originalBytes(Uint8Array) を再パースして、各パーツの
+  // localPos.x(blockStart+3) / quat.y(+7) / quat.z(+8) の value バイトオフセットと
+  // 現在値を集め、符号反転の edit 配列を作る。
+  function buildMirrorEdits(item){
+    const ob = item.originalBytes;
+    const buf = ob.buffer.slice(ob.byteOffset, ob.byteOffset + ob.byteLength);
+    const reader = new NRBFReader(buf);
+    const parsed = reader.parse();
+    if(!parsed || parsed._class !== 'WeaponisedAnimalPrefab') throw new Error('WeaponisedAnimalPrefab ではありません');
+    const rec = parsed.animalRecord;
+    const pairs = rec && rec.props && rec.props.KeyValuePairs;
+    if(!Array.isArray(pairs)) throw new Error('props.KeyValuePairs がありません');
+
+    // key -> {valOff, val}
+    const byKey = new Map();
+    for(const p of pairs){
+      if(p && p.key !== undefined && p.value !== undefined){
+        byKey.set(p.key, { valOff: reader.getValueOffset(p, 'value'), val: p.value });
+      }
+    }
+    // パーツ列: key=100 から 11int ブロック連番
+    const edits = [];
+    let i = 100, parts = 0;
+    while(byKey.has(i)){
+      for(const k of [3, 7, 8]){              // localPos.x / quat.y / quat.z
+        const e = byKey.get(i + k);
+        if(e && e.valOff != null) edits.push({ offset: e.valOff, newRawValue: (-e.val) | 0 });
+      }
+      i += 11; parts++;
+    }
+    const range = reader.getStringRange(parsed, 'prefabName');
+    const baseName = (item.newPrefabName !== undefined ? item.newPrefabName : (parsed.prefabName || 'unit'));
+    return { edits, parts, range, baseName };
+  }
+
+  function triggerDownload(bytes, name, mime){
+    const blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function mirrorItem(item){
+    const { edits, parts, range, baseName } = buildMirrorEdits(item);
+    if(parts === 0){ alert('パーツが見つかりませんでした（反転対象なし）'); return; }
+    // 反転は全て in-place の値書き換え。元のバイト長は変わらない。
+    let modified = applyEdits(item.originalBytes, edits);
+    const mirrorName = baseName + 'ミラー';
+    if(range) modified = replaceString(modified, range.lpsStart, range.lpsEnd, mirrorName);
+
+    const safe = mirrorName.replace(/[\\/:*?"<>|]/g, '_');
+    let outName = item.filename.replace(/^(WEP_ANIM_PREF_)[^_]*(_\d{4})/, function(_, p, suffix){ return p + safe + suffix; });
+    if(outName === item.filename) outName = 'WEP_ANIM_PREF_' + safe + '_mirror';
+    triggerDownload(modified, outName, 'application/octet-stream');
+
+    // サムネ(-IMEG.jpg)があれば同名で一緒に保存
+    if(item.imageBytes){
+      const ext = (item.imageExt || '.jpg').toLowerCase();
+      const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
+      let imgName = item.imageFile
+        ? item.imageFile.name.replace(/^(WEP_ANIM_PREF_)[^_]*(_\d{4})/, function(_, p, suffix){ return p + safe + suffix; })
+        : (outName + '-IMEG.jpg');
+      if(item.imageFile && imgName === item.imageFile.name) imgName = outName + '-IMEG.jpg';
+      setTimeout(function(){ triggerDownload(item.imageBytes, imgName, mime); }, 700);
+    }
+  }
+
+  // 各カードの download ボタンの隣にミラーボタンを差し込む
+  function injectButtons(){
+    const dls = document.querySelectorAll('button[data-action="download"]');
+    dls.forEach(function(dl){
+      if(dl.dataset.mirrorAttached) return;          // 二重挿入防止
+      dl.dataset.mirrorAttached = '1';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = dl.className;                    // 既存スタイルを流用
+      btn.textContent = '🔄 左右反転コピーを保存';
+      btn.title = '土台はそのまま、全パーツを左右反転したコピーを保存します（元ファイルは変わりません）';
+      btn.style.marginLeft = '8px';
+      btn.addEventListener('click', function(){
+        const item = (typeof state !== 'undefined' && state.items)
+          ? state.items.find(function(x){ return 'dl-' + x.id === dl.id; })
+          : null;
+        if(!item){ alert('対象プレハブが見つかりません'); return; }
+        try { mirrorItem(item); }
+        catch(err){ alert('反転に失敗: ' + (err && err.message ? err.message : err)); }
+      });
+      dl.insertAdjacentElement('afterend', btn);
+    });
+  }
+
+  // 結果が再描画されるたびに注入（MutationObserver）
+  function start(){
+    const results = document.getElementById('results');
+    if(!results){ setTimeout(start, 300); return; }
+    injectButtons();
+    new MutationObserver(injectButtons).observe(results, { childList: true, subtree: true });
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+</script>
