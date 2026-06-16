@@ -2337,11 +2337,9 @@ render();
 <!-- =======================================================================
   ARBS Prefab Analyzer — 左右反転(mirror) + 片側対称化(symmetrize) アドオン  v2
   </body> 直前に貼り付け。NRBFReader / applyEdits / replaceString / state 再利用。
-  ボタン3つを各カードの「変更ファイルをダウンロード」横に追加:
-    🔄 左右反転コピーを保存        … 全パーツを左右反転した別ユニットを保存
-    ⇄ 左→右 対称化 / ⇄ 右→左 対称化 … 片側だけ作った状態から反対側へ鏡像を追記
-  反転/対称化とも「左右ペアの土台ボーン(脚など)」を自動検出して親ボーンを入替えるため、
-  靴・手足も正しく反対側へ移ります。対称化は元パーツを消さない追記方式=安全。
+  ボタン: 🔄左右反転 / ⇄左→右 対称化 / ⇄右→左 対称化 / 🗑右半分削除 / 🗑左半分削除
+  反転/対称化/削除とも「左右ペアの土台ボーン(脚など)」を自動検出。対称化・削除は元データを
+  消さない安全方式（追記 or キー退避＋詰め直し／長さ不変）。
   ======================================================================= -->
 <script>
 (function(){
@@ -2356,8 +2354,8 @@ render();
     if(!parsed||parsed._class!=='WeaponisedAnimalPrefab') throw new Error('WeaponisedAnimalPrefab ではありません');
     var rec=parsed.animalRecord, dict=rec.props, arr=dict.KeyValuePairs;
     if(!Array.isArray(arr)) throw new Error('props.KeyValuePairs がありません');
-    var valOff=new Map(), val=new Map(), minId=0;
-    for(var i=0;i<arr.length;i++){var p=arr[i]; if(p&&p.key!==undefined){ val.set(p.key,p.value); valOff.set(p.key,reader.getValueOffset(p,'value')); if(p._id<minId)minId=p._id; }}
+    var valOff=new Map(), keyOff=new Map(), val=new Map(), minId=0;
+    for(var i=0;i<arr.length;i++){var p=arr[i]; if(p&&p.key!==undefined){ val.set(p.key,p.value); valOff.set(p.key,reader.getValueOffset(p,'value')); keyOff.set(p.key,reader.getValueOffset(p,'key')); if(p._id<minId)minId=p._id; }}
     var N=0, parts=[]; while(val.has(PK+N*BS)){ var b=[]; for(var j=0;j<BS;j++) b.push(val.get(PK+N*BS+j)); parts.push(b); N++; }
     if(N===0) throw new Error('パーツがありません');
     var g=new Map(); for(var k=0;k<parts.length;k++){var bb=parts[k]; if(!g.has(bb[10]))g.set(bb[10],[]); g.get(bb[10]).push(bb);}
@@ -2369,7 +2367,7 @@ render();
     sc.sort(function(a,b){return b[0]-a[0];});
     var pm=new Map(), used=new Set();
     for(var s=0;s<sc.length;s++){var a=sc[s][1],b=sc[s][2]; if(used.has(a)||used.has(b)||sc[s][0]<0.5)continue; pm.set(a,b);pm.set(b,a);used.add(a);used.add(b);}
-    return {buf:buf,reader:reader,parsed:parsed,dict:dict,arr:arr,parts:parts,N:N,g:g,pm:pm,val:val,valOff:valOff,minId:minId};
+    return {buf:buf,reader:reader,parsed:parsed,dict:dict,arr:arr,parts:parts,N:N,g:g,pm:pm,val:val,valOff:valOff,keyOff:keyOff,minId:minId};
   }
   function mirBlock(b,par){var nb=b.slice();nb[3]=-nb[3];nb[7]=-nb[7];nb[8]=-nb[8];nb[10]=par;return nb;}
   function dl(bytes,name){var bl=new Blob([bytes],{type:'application/octet-stream'});var u=URL.createObjectURL(bl);var a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(u);},1000);}
@@ -2419,6 +2417,30 @@ render();
     dl(out,outName(item,name)); dlThumb(item,name);
   }
 
+  // ---- 片側半分を削除（キー退避＋詰め直し。元データは消さず長さ不変＝安全） ----
+  function deleteHalf(item,side){ // side 'R'(右側を削除) or 'L'(左側を削除)
+    var A=analyzeParts(item.originalBytes);
+    var pairSide=new Map();
+    A.pm.forEach(function(b,a){ if(pairSide.has(a))return; var lst=A.g.get(a),s=0; for(var i=0;i<lst.length;i++)s+=lst[i][3]; pairSide.set(a, s>=0?'R':'L'); });
+    var deleted=new Set();
+    for(var i=0;i<A.parts.length;i++){ var b=A.parts[i],sd;
+      if(A.pm.has(b[10])) sd=pairSide.get(b[10]);
+      else { var x=b[3]; sd=(Math.abs(x)<=EPS)?'C':(x>0?'R':'L'); }
+      if(sd===side) deleted.add(i);
+    }
+    if(deleted.size===0) throw new Error('その側に削除するパーツがありません');
+    var edits=[], newIndex=0;
+    for(var i=0;i<A.parts.length;i++){ var bs=PK+i*BS;
+      if(deleted.has(i)){ for(var k=0;k<BS;k++){ var off=A.keyOff.get(bs+k); if(off!=null) edits.push({offset:off,newRawValue:990000+bs+k}); } }
+      else { var nb=PK+newIndex*BS; for(var k=0;k<BS;k++){ var off=A.keyOff.get(bs+k); if(off!=null) edits.push({offset:off,newRawValue:nb+k}); } newIndex++; }
+    }
+    var modified=applyEdits(item.originalBytes,edits);
+    var base=(item.newPrefabName!==undefined?item.newPrefabName:(item.summary&&item.summary.name)||'unit');
+    var name=base+(side==='R'?'(右削除)':'(左削除)');
+    var range=A.reader.getStringRange(A.parsed,'prefabName'); if(range) modified=replaceString(modified,range.lpsStart,range.lpsEnd,name);
+    dl(modified,outName(item,name)); dlThumb(item,name);
+  }
+
   function findItem(d){ return (typeof state!=='undefined'&&state.items)?state.items.find(function(x){return 'dl-'+x.id===d.id;}):null; }
   function btn(d,label,title,fn){ var b=document.createElement('button');b.type='button';b.className=d.className;b.textContent=label;b.title=title;b.style.marginLeft='8px';
     b.addEventListener('click',function(){var it=findItem(d);if(!it){alert('対象が見つかりません');return;}try{fn(it);}catch(e){alert(label+' に失敗: '+(e&&e.message?e.message:e));}}); return b; }
@@ -2428,6 +2450,10 @@ render();
     var bR=btn(d,'⇄ 右→左 対称化',tSym,function(it){doSymmetrize(it,'R2L');});
     var bL=btn(d,'⇄ 左→右 対称化',tSym,function(it){doSymmetrize(it,'L2R');});
     var bM=btn(d,'🔄 左右反転コピーを保存','全パーツを左右反転した別ユニットを保存します（脚・靴も正しく反転）',function(it){doMirror(it);});
+    var tDel='中心より片側のパーツを削除して保存します（中央は座標、脚など左右ペアはボーン単位で判定／元は変えず別名保存）';
+    var bDL=btn(d,'🗑 左半分を削除',tDel,function(it){deleteHalf(it,'L');});
+    var bDR=btn(d,'🗑 右半分を削除',tDel,function(it){deleteHalf(it,'R');});
+    d.insertAdjacentElement('afterend',bDL); d.insertAdjacentElement('afterend',bDR);
     d.insertAdjacentElement('afterend',bR); d.insertAdjacentElement('afterend',bL); d.insertAdjacentElement('afterend',bM);
   }); }
   function start(){ var r=document.getElementById('results'); if(!r){setTimeout(start,300);return;} inject(); new MutationObserver(inject).observe(r,{childList:true,subtree:true}); }
