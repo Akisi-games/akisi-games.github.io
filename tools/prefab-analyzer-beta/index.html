@@ -2335,120 +2335,102 @@ render();
 </body>
 </html>
 <!-- =======================================================================
-  ARBS Prefab Analyzer — 左右反転(ミラー)アドオン
-  使い方: この <script> ブロックを index.html の </body> の直前に貼り付けるだけ。
-  既存コードは一切書き換えません。ページ内の NRBFReader / applyEdits /
-  replaceString / state をそのまま再利用します。
-  動作: 各プレハブカードの「変更ファイルをダウンロード」の隣に
-        「🔄 左右反転コピーを保存」ボタンを追加。押すと土台はそのままに
-        全パーツの localPos.x / 回転quat.y / 回転quat.z を符号反転した
-        コピー(別名「〜ミラー」)をダウンロードします。元ファイルは不変。
+  ARBS Prefab Analyzer — 左右反転(mirror) + 片側対称化(symmetrize) アドオン  v2
+  </body> 直前に貼り付け。NRBFReader / applyEdits / replaceString / state 再利用。
+  ボタン3つを各カードの「変更ファイルをダウンロード」横に追加:
+    🔄 左右反転コピーを保存        … 全パーツを左右反転した別ユニットを保存
+    ⇄ 左→右 対称化 / ⇄ 右→左 対称化 … 片側だけ作った状態から反対側へ鏡像を追記
+  反転/対称化とも「左右ペアの土台ボーン(脚など)」を自動検出して親ボーンを入替えるため、
+  靴・手足も正しく反対側へ移ります。対称化は元パーツを消さない追記方式=安全。
   ======================================================================= -->
 <script>
 (function(){
   'use strict';
+  var BS=11, EPS=5000, PK=100, NEG=[3,7,8];
+  function nextPrime(n){function p(x){if(x<2)return false;for(var i=2;i*i<=x;i++)if(x%i===0)return false;return true;}while(!p(n))n++;return n;}
 
-  // item.originalBytes(Uint8Array) を再パースして、各パーツの
-  // localPos.x(blockStart+3) / quat.y(+7) / quat.z(+8) の value バイトオフセットと
-  // 現在値を集め、符号反転の edit 配列を作る。
-  function buildMirrorEdits(item){
-    const ob = item.originalBytes;
-    const buf = ob.buffer.slice(ob.byteOffset, ob.byteOffset + ob.byteLength);
-    const reader = new NRBFReader(buf);
-    const parsed = reader.parse();
-    if(!parsed || parsed._class !== 'WeaponisedAnimalPrefab') throw new Error('WeaponisedAnimalPrefab ではありません');
-    const rec = parsed.animalRecord;
-    const pairs = rec && rec.props && rec.props.KeyValuePairs;
-    if(!Array.isArray(pairs)) throw new Error('props.KeyValuePairs がありません');
+  // 共通: originalBytes を再パースし、parts / pairMap(左右ペア親) / reader / dict などを返す
+  function analyzeParts(ob){
+    var buf=ob.buffer.slice(ob.byteOffset,ob.byteOffset+ob.byteLength);
+    var reader=new NRBFReader(buf); var parsed=reader.parse();
+    if(!parsed||parsed._class!=='WeaponisedAnimalPrefab') throw new Error('WeaponisedAnimalPrefab ではありません');
+    var rec=parsed.animalRecord, dict=rec.props, arr=dict.KeyValuePairs;
+    if(!Array.isArray(arr)) throw new Error('props.KeyValuePairs がありません');
+    var valOff=new Map(), val=new Map(), minId=0;
+    for(var i=0;i<arr.length;i++){var p=arr[i]; if(p&&p.key!==undefined){ val.set(p.key,p.value); valOff.set(p.key,reader.getValueOffset(p,'value')); if(p._id<minId)minId=p._id; }}
+    var N=0, parts=[]; while(val.has(PK+N*BS)){ var b=[]; for(var j=0;j<BS;j++) b.push(val.get(PK+N*BS+j)); parts.push(b); N++; }
+    if(N===0) throw new Error('パーツがありません');
+    var g=new Map(); for(var k=0;k<parts.length;k++){var bb=parts[k]; if(!g.has(bb[10]))g.set(bb[10],[]); g.get(bb[10]).push(bb);}
+    function maxAbsX(l){var m=0;for(var i=0;i<l.length;i++)m=Math.max(m,Math.abs(l[i][3]));return m;}
+    var off=[]; g.forEach(function(l,p){ if(maxAbsX(l)<20000&&l.length>=3) off.push(p); }); off.sort(function(a,b){return a-b;});
+    function prof(l){var m=new Map();for(var i=0;i<l.length;i++){var b=l[i];var key=[Math.round(b[4]/1e4)/10,Math.round(b[5]/1e4)/10,Math.round(Math.abs(b[3])/1e4)/10,Math.round(b[1]/1e4)/10].join(',');m.set(key,(m.get(key)||0)+1);}return m;}
+    function sim(a,b){var ca=prof(g.get(a)),cb=prof(g.get(b)),s=0;ca.forEach(function(v,k){s+=Math.min(v,cb.get(k)||0);});return s/Math.max(g.get(a).length,1);}
+    var sc=[]; for(var x=0;x<off.length;x++)for(var y=x+1;y<off.length;y++) if(g.get(off[x]).length===g.get(off[y]).length) sc.push([sim(off[x],off[y]),off[x],off[y]]);
+    sc.sort(function(a,b){return b[0]-a[0];});
+    var pm=new Map(), used=new Set();
+    for(var s=0;s<sc.length;s++){var a=sc[s][1],b=sc[s][2]; if(used.has(a)||used.has(b)||sc[s][0]<0.5)continue; pm.set(a,b);pm.set(b,a);used.add(a);used.add(b);}
+    return {buf:buf,reader:reader,parsed:parsed,dict:dict,arr:arr,parts:parts,N:N,g:g,pm:pm,val:val,valOff:valOff,minId:minId};
+  }
+  function mirBlock(b,par){var nb=b.slice();nb[3]=-nb[3];nb[7]=-nb[7];nb[8]=-nb[8];nb[10]=par;return nb;}
+  function dl(bytes,name){var bl=new Blob([bytes],{type:'application/octet-stream'});var u=URL.createObjectURL(bl);var a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(u);},1000);}
+  function outName(item,name){var safe=name.replace(/[\\/:*?"<>|]/g,'_');var o=item.filename.replace(/^(WEP_ANIM_PREF_)[^_]*(_\d{4})/,function(_,p,s){return p+safe+s;});return o===item.filename?('WEP_ANIM_PREF_'+safe+'_x'):o;}
+  function dlThumb(item,name){ if(!item.imageBytes)return; var safe=name.replace(/[\\/:*?"<>|]/g,'_'); var ext=(item.imageExt||'.jpg').toLowerCase();var mime=ext==='.png'?'image/png':'image/jpeg';
+    var on=outName(item,name); var in_=item.imageFile?item.imageFile.name.replace(/^(WEP_ANIM_PREF_)[^_]*(_\d{4})/,function(_,p,s){return p+safe+s;}):(on+'-IMEG.jpg'); if(item.imageFile&&in_===item.imageFile.name)in_=on+'-IMEG.jpg';
+    setTimeout(function(){dl(item.imageBytes,in_);},700); }
 
-    // key -> {valOff, val}
-    const byKey = new Map();
-    for(const p of pairs){
-      if(p && p.key !== undefined && p.value !== undefined){
-        byKey.set(p.key, { valOff: reader.getValueOffset(p, 'value'), val: p.value });
-      }
+  // ---- 左右反転（全体ミラー） ----
+  function doMirror(item){
+    var A=analyzeParts(item.originalBytes);
+    var edits=[];
+    for(var i=0;i<A.parts.length;i++){ var base=PK+i*BS;
+      [3,7,8].forEach(function(o){ var off=A.valOff.get(base+o); if(off!=null) edits.push({offset:off,newRawValue:(-A.val.get(base+o))|0}); });
+      var par=A.val.get(base+10); if(A.pm.has(par)){ var off10=A.valOff.get(base+10); if(off10!=null) edits.push({offset:off10,newRawValue:A.pm.get(par)}); }
     }
-    // パーツ列: key=100 から 11int ブロック連番
-    const edits = [];
-    let i = 100, parts = 0;
-    while(byKey.has(i)){
-      for(const k of [3, 7, 8]){              // localPos.x / quat.y / quat.z
-        const e = byKey.get(i + k);
-        if(e && e.valOff != null) edits.push({ offset: e.valOff, newRawValue: (-e.val) | 0 });
-      }
-      i += 11; parts++;
-    }
-    const range = reader.getStringRange(parsed, 'prefabName');
-    const baseName = (item.newPrefabName !== undefined ? item.newPrefabName : (parsed.prefabName || 'unit'));
-    return { edits, parts, range, baseName };
+    var modified=applyEdits(item.originalBytes,edits);
+    var base=(item.newPrefabName!==undefined?item.newPrefabName:(item.summary&&item.summary.name)||'unit'); var name=base+'ミラー';
+    var range=A.reader.getStringRange(A.parsed,'prefabName'); if(range) modified=replaceString(modified,range.lpsStart,range.lpsEnd,name);
+    dl(modified,outName(item,name)); dlThumb(item,name);
   }
 
-  function triggerDownload(bytes, name, mime){
-    const blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = name;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  // ---- 片側→反対側 対称化（追記方式） ----
+  function doSymmetrize(item,direction){
+    var A=analyzeParts(item.originalBytes);
+    var srcNeg=(direction==='L2R'); var appended=[];
+    for(var t=0;t<A.parts.length;t++){var b=A.parts[t]; if(A.pm.has(b[10]))continue; var xx=b[3]; if(Math.abs(xx)<=EPS)continue; var isSrc=srcNeg?(xx<0):(xx>0); if(isSrc)appended.push(mirBlock(b,b[10]));}
+    var done=new Set();
+    A.pm.forEach(function(b,a){var key=Math.min(a,b)+'_'+Math.max(a,b); if(done.has(key))return; done.add(key);
+      var na=A.g.get(a).length, nb=A.g.get(b).length; if(!na&&!nb)return; var src=na>=nb?a:b, dst=na>=nb?b:a;
+      var lst=A.g.get(src); for(var i=0;i<lst.length;i++) appended.push(mirBlock(lst[i],dst)); });
+    if(appended.length===0) throw new Error('追記対象がありません（その側にパーツが無い？）');
+    var addCount=appended.length*BS; var entries=new Uint8Array(addCount*17), edv=new DataView(entries.buffer);
+    var metaId=A.arr[0]._id, oid=A.minId-1, pos=0, keyBase=PK+A.N*BS;
+    for(var pi=0;pi<appended.length;pi++){ for(var jj=0;jj<BS;jj++){ var key=keyBase+pi*BS+jj;
+      entries[pos]=1; edv.setInt32(pos+1,oid,true); edv.setInt32(pos+5,metaId,true); edv.setInt32(pos+9,key,true); edv.setInt32(pos+13,appended[pi][jj],true); pos+=17; oid--; } }
+    var orig=new Uint8Array(A.buf), endOff=A.arr.__endOffset, lenOff=A.arr.__lengthOffset;
+    var out=new Uint8Array(orig.length+entries.length);
+    out.set(orig.subarray(0,endOff),0); out.set(entries,endOff); out.set(orig.subarray(endOff),endOff+entries.length);
+    var odv=new DataView(out.buffer); var newCount=A.arr.length+addCount; odv.setInt32(lenOff,newCount,true);
+    var verOff=A.reader.getValueOffset(A.dict,'Version'), hashOff=A.reader.getValueOffset(A.dict,'HashSize');
+    if(verOff!=null) odv.setInt32(verOff,newCount,true);
+    if(hashOff!=null){var hs=odv.getInt32(hashOff,true); if(hs<newCount) odv.setInt32(hashOff,nextPrime(newCount*2+1),true);}
+    var base=(item.newPrefabName!==undefined?item.newPrefabName:(item.summary&&item.summary.name)||'unit');
+    var name=base+(direction==='L2R'?'対称(左→右)':'対称(右→左)');
+    var range=A.reader.getStringRange(A.parsed,'prefabName'); if(range) out=replaceString(out,range.lpsStart,range.lpsEnd,name);
+    dl(out,outName(item,name)); dlThumb(item,name);
   }
 
-  function mirrorItem(item){
-    const { edits, parts, range, baseName } = buildMirrorEdits(item);
-    if(parts === 0){ alert('パーツが見つかりませんでした（反転対象なし）'); return; }
-    // 反転は全て in-place の値書き換え。元のバイト長は変わらない。
-    let modified = applyEdits(item.originalBytes, edits);
-    const mirrorName = baseName + 'ミラー';
-    if(range) modified = replaceString(modified, range.lpsStart, range.lpsEnd, mirrorName);
-
-    const safe = mirrorName.replace(/[\\/:*?"<>|]/g, '_');
-    let outName = item.filename.replace(/^(WEP_ANIM_PREF_)[^_]*(_\d{4})/, function(_, p, suffix){ return p + safe + suffix; });
-    if(outName === item.filename) outName = 'WEP_ANIM_PREF_' + safe + '_mirror';
-    triggerDownload(modified, outName, 'application/octet-stream');
-
-    // サムネ(-IMEG.jpg)があれば同名で一緒に保存
-    if(item.imageBytes){
-      const ext = (item.imageExt || '.jpg').toLowerCase();
-      const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
-      let imgName = item.imageFile
-        ? item.imageFile.name.replace(/^(WEP_ANIM_PREF_)[^_]*(_\d{4})/, function(_, p, suffix){ return p + safe + suffix; })
-        : (outName + '-IMEG.jpg');
-      if(item.imageFile && imgName === item.imageFile.name) imgName = outName + '-IMEG.jpg';
-      setTimeout(function(){ triggerDownload(item.imageBytes, imgName, mime); }, 700);
-    }
-  }
-
-  // 各カードの download ボタンの隣にミラーボタンを差し込む
-  function injectButtons(){
-    const dls = document.querySelectorAll('button[data-action="download"]');
-    dls.forEach(function(dl){
-      if(dl.dataset.mirrorAttached) return;          // 二重挿入防止
-      dl.dataset.mirrorAttached = '1';
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = dl.className;                    // 既存スタイルを流用
-      btn.textContent = '🔄 左右反転コピーを保存';
-      btn.title = '土台はそのまま、全パーツを左右反転したコピーを保存します（元ファイルは変わりません）';
-      btn.style.marginLeft = '8px';
-      btn.addEventListener('click', function(){
-        const item = (typeof state !== 'undefined' && state.items)
-          ? state.items.find(function(x){ return 'dl-' + x.id === dl.id; })
-          : null;
-        if(!item){ alert('対象プレハブが見つかりません'); return; }
-        try { mirrorItem(item); }
-        catch(err){ alert('反転に失敗: ' + (err && err.message ? err.message : err)); }
-      });
-      dl.insertAdjacentElement('afterend', btn);
-    });
-  }
-
-  // 結果が再描画されるたびに注入（MutationObserver）
-  function start(){
-    const results = document.getElementById('results');
-    if(!results){ setTimeout(start, 300); return; }
-    injectButtons();
-    new MutationObserver(injectButtons).observe(results, { childList: true, subtree: true });
-  }
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-  else start();
+  function findItem(d){ return (typeof state!=='undefined'&&state.items)?state.items.find(function(x){return 'dl-'+x.id===d.id;}):null; }
+  function btn(d,label,title,fn){ var b=document.createElement('button');b.type='button';b.className=d.className;b.textContent=label;b.title=title;b.style.marginLeft='8px';
+    b.addEventListener('click',function(){var it=findItem(d);if(!it){alert('対象が見つかりません');return;}try{fn(it);}catch(e){alert(label+' に失敗: '+(e&&e.message?e.message:e));}}); return b; }
+  function inject(){ document.querySelectorAll('button[data-action="download"]').forEach(function(d){
+    if(d.dataset.msAttached)return; d.dataset.msAttached='1';
+    var tSym='片側だけ作った状態から反対側へ鏡像を追記して左右対称にします（元は消さず空き側に追加）';
+    var bR=btn(d,'⇄ 右→左 対称化',tSym,function(it){doSymmetrize(it,'R2L');});
+    var bL=btn(d,'⇄ 左→右 対称化',tSym,function(it){doSymmetrize(it,'L2R');});
+    var bM=btn(d,'🔄 左右反転コピーを保存','全パーツを左右反転した別ユニットを保存します（脚・靴も正しく反転）',function(it){doMirror(it);});
+    d.insertAdjacentElement('afterend',bR); d.insertAdjacentElement('afterend',bL); d.insertAdjacentElement('afterend',bM);
+  }); }
+  function start(){ var r=document.getElementById('results'); if(!r){setTimeout(start,300);return;} inject(); new MutationObserver(inject).observe(r,{childList:true,subtree:true}); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
 })();
 </script>
