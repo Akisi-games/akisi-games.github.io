@@ -2460,3 +2460,153 @@ render();
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
 })();
 </script>
+
+
+<!-- ============================================================
+     ARBS パーツ／ベース置換アドオン v1  (2026-06-17)
+     色編集タブとは別に「同カテゴリ内でのパーツ置換／ベース置換」を追加。
+     既存関数(analyze/applyEdits/downloadModified/updateModifiedState/render)を
+     ラップするだけで、本体ロジックは変更しない。
+     ============================================================ -->
+<style>
+.arbs-swap-panel{margin-top:14px;border:1px solid var(--border-soft);border-radius:10px;padding:12px 14px;background:var(--bg-soft);}
+.arbs-swap-panel h4{margin:0 0 10px;font-size:13px;letter-spacing:1px;color:var(--cyan);font-weight:900;}
+.arbs-swap-row{display:flex;align-items:center;gap:8px;padding:5px 0;flex-wrap:wrap;border-bottom:1px solid var(--border-soft);}
+.arbs-swap-row:last-child{border-bottom:none;}
+.arbs-swap-cur{min-width:170px;font-size:13px;color:var(--text);}
+.arbs-swap-cat{display:inline-block;font-size:10px;padding:1px 7px;border-radius:999px;background:#00f0ff22;color:var(--cyan);margin-right:5px;letter-spacing:1px;}
+.arbs-swap-cat.base{background:#fff20022;color:var(--yellow);}
+.arbs-swap-arrow{color:var(--text-muted);}
+.arbs-swap-sel{background:var(--bg);color:var(--text);border:1px solid var(--border-soft);border-radius:6px;padding:5px 8px;font-size:12px;min-width:200px;}
+.arbs-swap-sel.changed{border-color:var(--yellow);color:var(--yellow);}
+.arbs-swap-cnt{font-size:11px;color:var(--text-muted);}
+.arbs-swap-hint{font-size:11px;color:var(--text-muted);margin-bottom:8px;}
+</style>
+<script>
+(function(){
+  "use strict";
+  const ARBS_SWAP_DATA={"SWAP_GROUPS": {"武器": {"category": "武器", "options": {"ピアサー": 4000, "ダイナマイト": 4001, "マシンガン": 4002, "ミサイルランチャー": 4003, "鋼の触手": 4004, "もり": 4005, "スパイク(スピア)": 4006, "触手(茶)": 4024, "触手(黄)": 4025, "触手(赤)": 4026, "触手(青)": 4027, "ボーンスパイク(短白)": 4028, "ボーンスパイク(短赤)": 4029, "ボーンスパイク(長白)": 4030, "ボーンスパイク(長赤)": 4031, "ボーンスパイク(短白曲)": 4032, "ボーンスパイク(短赤曲)": 4033, "ボーンスパイク(長白曲)": 4034, "ボーンスパイク(長赤曲)": 4035, "パンチャー(人1右)": 4036, "パンチャー(溶岩右)": 4037, "パンチャー(ゴリラ右)": 4038, "パンチャー(スケルトン右)": 4039, "パンチャー(人1左)": 4058, "パンチャー(溶岩左)": 4059, "パンチャー(ゴリラ左)": 4060, "パンチャー(スケルトン左)": 4061, "ソードハンド(人1右)": 4062, "ソードハンド(人1左)": 4063, "ソードハンド(溶岩右)": 4064, "ソードハンド(溶岩左)": 4065, "ソードハンド(ゴリラ右)": 4066, "ソードハンド(ゴリラ左)": 4067, "ソードハンド(スケルトン右)": 4068, "ソードハンド(スケルトン左)": 4069, "ハンマーハンド(人1右)": 4070, "ハンマーハンド(人1左)": 4071, "ハンマーハンド(溶岩右)": 4072, "ハンマーハンド(溶岩左)": 4073, "ハンマーハンド(ゴリラ右)": 4074, "ハンマーハンド(ゴリラ左)": 4075, "ハンマーハンド(スケルトン右)": 4076, "ハンマーハンド(スケルトン左)": 4077, "槍の手(人1右)": 4078, "槍の手(人1左)": 4079, "槍の手(溶岩右)": 4080, "槍の手(溶岩左)": 4081, "槍の手(ゴリラ右)": 4082, "槍の手(ゴリラ左)": 4083, "槍の手(スケルトン右)": 4084, "槍の手(スケルトン左)": 4085, "バリスタ": 4089, "ボクシンググローブ": 4192, "スパイク(丸黒)": 4198, "スパイク(丸金)": 4199, "スパイク(丸銀)": 4200, "スパイク(角黒)": 4201, "スパイク(角金)": 4202, "スパイク(角銀)": 4203, "ブレード(黒短)": 4204, "ブレード(金短)": 4205, "ブレード(銀短)": 4206, "ブレード(赤短)": 4207, "ブレード(青短)": 4208, "ブレード(緑短)": 4209, "ブレード(黒短曲)": 4210, "ブレード(金短曲)": 4211, "ブレード(銀短曲)": 4212, "ブレード(赤短曲)": 4213, "ブレード(青短曲)": 4214, "ブレード(緑短曲)": 4215, "ブレード(黒長曲)": 4216, "ブレード(金長曲)": 4217, "ブレード(銀長曲)": 4218, "ブレード(赤長曲)": 4219, "ブレード(青長曲)": 4220, "ブレード(緑長曲)": 4221, "パンチャー(人2右)": 4230, "パンチャー(人2左)": 4231, "ソードハンド(人2右)": 4232, "ソードハンド(人2左)": 4233, "ハンマーハンド(人2右)": 4234, "ハンマーハンド(人2左)": 4235, "槍の手(人2右)": 4236, "槍の手(人2左)": 4237, "爪(ティラノ左腕)": 4257, "爪(ティラノ右腕)": 4258, "爪(スピノ左腕)": 4259, "爪(スピノ右腕)": 4260, "爪(アロ左腕)": 4261, "爪(アロ右腕)": 4262, "爪(クリロフォ左腕)": 4263, "爪(クリロフォ右腕)": 4264, "爪(テリジノ左腕)": 4265, "爪(テリジノ右腕)": 4266, "ライトニングガン": 4280, "プラズマキャノン(青)": 4281, "プラズマキャノン(赤)": 4282, "プラズマキャノン(黄)": 4283, "プラズマキャノン(紫)": 4284, "プラズマキャノン(緑)": 4285, "プラズマビーム・T-Rex(青)": 4286, "プラズマビーム・T-Rex(赤)": 4287, "プラズマビーム・T-Rex(黄)": 4288, "プラズマビーム・T-Rex(紫)": 4289, "プラズマビーム・T-Rex(緑)": 4290, "ロケットランチャー": 4343, "火炎放射器(武器2)": 4354, "B.O.S.S-ロケット発射台": 4631, "B.O.S.S-機関銃": 4632, "S.P.I.D.E.R-サンダーボルト": 4636, "S.P.I.D.E.R-カミカゼドローン": 4637, "S.P.I.D.E.R-プラズマフィールド": 4638, "焼夷ロケット": 4639, "レールガン": 4640, "プラズマキャノン(武器3)": 4641, "グランドミサイル": 4642, "火炎放射器(武器3)": 4643, "対空ミサイル": 4644, "イオンシールド": 4645, "自動砲塔": 4646}}, "頭": {"category": "頭", "options": {"ヒルジャイアント": 4226, "ゴリラ": 4227, "スケルトン": 4228, "男性1": 4229, "男性2": 4240, "男性3": 4241, "女性": 4242, "バッファロー": 4270, "サイ": 4271, "キリン": 4272, "ゾウ": 4273, "パラサウロロフス": 4274, "アンキロ": 4268, "トリケラ": 4267, "ブラキオ": 4269, "スケルトントリケラ": 4355, "スケルトンブラキオ": 4356, "ディロフォ": 4248, "スケルトンカルノ": 4358, "アロ": 4247, "スピノ": 4246, "ティラノ": 4245, "スケルトンティラノ": 4357, "ヘルハウンド": 4348, "カプリコーン": 4352, "ティタノ": 4351, "プルス": 4349}}, "胴体": {"category": "胴体", "options": {"ヒルジャイアント": 4222, "ゴリラ": 4223, "スケルトン": 4224, "男性1": 4225, "男性2": 4238, "女性": 4239, "パラサウロロフス": 4279, "ディロフォ": 4252, "アロ": 4251, "スピノ": 4250, "ティラノ": 4249, "スケルトンティラノ": 4359}}, "尻尾": {"category": "尻尾", "options": {"ディロフォ": 4256, "アロ": 4255, "スピノ": 4254, "ティラノ": 4253, "トリケラ": 4275, "アンキロ": 4276, "パラサウロロフス": 4277, "ブラキオ": 4278, "プルス": 4353, "スケルトン1": 4360, "スケルトン2": 4361}}, "翼": {"category": "翼", "options": {"ワイバーン赤": 4291, "ワイバーン茶": 4292, "ワイバーン青": 4293, "ワイバーン金": 4294, "ワイバーン緑": 4295, "未ラベル要確認": 4296, "ウイング茶": 4297, "ウイング緑": 4298, "ウイング赤": 4299, "ウイング黄": 4300, "ウイング青": 4301}}, "胸部": {"category": "胸部", "options": {"B.O.S.S胸部": 4630}}}, "BASE_GROUPS": {"人型": {"options": {"ヒルジャイアント": 88, "ゴリラ": 89, "スケルトン": 90, "男性1": 91, "男性2": 92, "女性": 93, "カプリコーン": 99}}, "現代哺乳類": {"options": {"バッファロー": 103, "サイ": 104, "キリン": 105, "ゾウ": 106}}, "草食恐竜": {"options": {"パラサウロロフス": 95, "アンキロ": 101, "トリケラ": 100, "スケルトントリケラ": 116, "スケルトンブラキオ": 117, "ブラキオ": 102}}, "肉食恐竜": {"options": {"ディロフォ": 98, "アロ": 96, "スピノ": 97, "ティラノ": 94, "スケルトンティラノ": 118}}, "飛竜/その他": {"options": {"ワイバーン": 113, "プルスサウルス": 114}}, "ロボベース": {"options": {"箱ダイナミック": 87, "箱スタティック": 112, "球面": 121, "ホイール": 122, "4輪": 156, "二足": 123, "四足黄": 124, "四足青": 125, "四足赤": 126, "四足緑": 127, "B.O.S.S": 158, "S.P.I.D.E.R": 175}}}};
+  const ID2GROUP={}, ID2BASEGROUP={};
+  for(const [g,info] of Object.entries(ARBS_SWAP_DATA.SWAP_GROUPS))
+    for(const [label,id] of Object.entries(info.options)) ID2GROUP[id]={gname:g,options:info.options,label};
+  for(const [g,info] of Object.entries(ARBS_SWAP_DATA.BASE_GROUPS))
+    for(const [label,id] of Object.entries(info.options)) ID2BASEGROUP[id]={gname:g,options:info.options,label};
+  function W(name){ return window[name]; }
+  const _analyze=W('analyze');
+  if(_analyze){ window.analyze=function(parsed,reader){
+    const s=_analyze(parsed,reader);
+    try{ s.baseIdxOffset=reader.getValueOffset(parsed.animalRecord,'unitPrefabIndex'); }catch(e){ s.baseIdxOffset=null; }
+    return s;
+  }; try{ analyze=window.analyze; }catch(e){} }
+  function computeSwapEdits(item){
+    const edits=[]; const del=item.deleted||new Set();
+    if(item.partSwaps){
+      for(const b of (item.summary.allWeaponBlocks||[])){
+        if(del.has(b.blockStart)) continue;
+        const ns=item.partSwaps[b.idx];
+        if(ns!=null && b.prefabIdxOffset!=null) edits.push({offset:b.prefabIdxOffset,newRawValue:ns});
+      }
+    }
+    if(item.baseSwap!=null && item.summary.baseIdxOffset!=null){
+      try{ const dv=new DataView(item.originalBytes.buffer,item.originalBytes.byteOffset,item.originalBytes.byteLength);
+        if(dv.getInt32(item.summary.baseIdxOffset,true)===item.summary.baseIdx)
+          edits.push({offset:item.summary.baseIdxOffset,newRawValue:item.baseSwap});
+      }catch(e){}
+    }
+    return edits;
+  }
+  const _apply=W('applyEdits');
+  if(_apply){ window.applyEdits=function(orig,edits){
+    return _apply(orig,(edits||[]).concat(window.__arbsSwapEdits||[]));
+  }; try{ applyEdits=window.applyEdits; }catch(e){} }
+  const _dl=W('downloadModified');
+  if(_dl){ window.downloadModified=function(item){
+    window.__arbsSwapEdits=computeSwapEdits(item);
+    try{ _dl(item); } finally { window.__arbsSwapEdits=null; }
+  }; try{ downloadModified=window.downloadModified; }catch(e){} }
+  const _ums=W('updateModifiedState');
+  if(_ums){ window.updateModifiedState=function(item){
+    _ums(item);
+    const ps=item.partSwaps?Object.keys(item.partSwaps).length:0;
+    const bs=(item.baseSwap!=null);
+    if(ps||bs){
+      item.modified=true;
+      const r=document.querySelector('[data-result-id="'+item.id+'"]'); if(r) r.classList.add('modified');
+      const dl=document.getElementById('dl-'+item.id); if(dl) dl.disabled=false;
+      const info=document.getElementById('info-'+item.id);
+      if(info){ const ex=[]; if(ps) ex.push(ps+' パーツ置換'); if(bs) ex.push('ベース置換');
+        const base=(info.textContent&&info.textContent!=='変更なし')?info.textContent+' / ':''; info.textContent=base+ex.join(' / '); }
+    }
+  }; try{ updateModifiedState=window.updateModifiedState; }catch(e){} }
+  const _render=W('render');
+  if(_render){ window.render=function(){ const r=_render.apply(this,arguments); try{ injectAll(); }catch(e){ console.error('[swap-addon]',e); } return r; };
+    try{ render=window.render; }catch(e){} }
+  function optionTags(options,curId,selId){
+    let h='<option value="">— 変更なし —</option>';
+    for(const [label,id] of Object.entries(options)){
+      const sel=(selId!=null&&selId===id)?' selected':'';
+      const cur=(id===curId)?' (現在)':'';
+      h+='<option value="'+id+'"'+sel+'>'+label+cur+'</option>';
+    }
+    return h;
+  }
+  function buildPanel(item){
+    const s=item.summary; const div=document.createElement('div'); div.className='arbs-swap-panel';
+    let html='<h4>🔧 パーツ／ベース置換（同カテゴリ内）</h4>'+
+      '<div class="arbs-swap-hint">色変換タブが扱わない 武器・頭・胴体・四肢・ベース を、同じカテゴリ内で別パーツに差し替えます。</div>';
+    const bg=ID2BASEGROUP[s.baseIdx];
+    if(bg && s.baseIdxOffset!=null){
+      const cur=(s.baseInfo&&s.baseInfo.n)||('ID'+s.baseIdx);
+      html+='<div class="arbs-swap-row">'+
+        '<span class="arbs-swap-cur"><span class="arbs-swap-cat base">ベース['+bg.gname+']</span>'+escapeHTML(cur)+'</span>'+
+        '<span class="arbs-swap-arrow">→</span>'+
+        '<select class="arbs-swap-sel" data-item-id="'+item.id+'" data-kind="base">'+optionTags(bg.options,s.baseIdx,item.baseSwap)+'</select>'+
+        '</div>';
+    }
+    const counts={};
+    for(const b of (s.allWeaponBlocks||[])){
+      if(window.PREFAB_ID_TO_GROUP && PREFAB_ID_TO_GROUP[b.idx]) continue;
+      if(!ID2GROUP[b.idx]) continue;
+      counts[b.idx]=(counts[b.idx]||0)+1;
+    }
+    const ids=Object.keys(counts).map(Number).sort((a,b)=>counts[b]-counts[a]);
+    for(const id of ids){
+      const g=ID2GROUP[id]; const nm=g.label;
+      const selId=item.partSwaps?item.partSwaps[id]:null;
+      html+='<div class="arbs-swap-row">'+
+        '<span class="arbs-swap-cur"><span class="arbs-swap-cat">'+escapeHTML(g.gname)+'</span>'+escapeHTML(nm)+' <span class="arbs-swap-cnt">×'+counts[id]+'</span></span>'+
+        '<span class="arbs-swap-arrow">→</span>'+
+        '<select class="arbs-swap-sel" data-item-id="'+item.id+'" data-kind="part" data-from="'+id+'">'+optionTags(g.options,id,selId)+'</select>'+
+        '</div>';
+    }
+    if(!bg && ids.length===0){ html+='<div class="arbs-swap-hint">このプレハブには置換対象（武器/頭/胴体/四肢/ベース）が見つかりませんでした。</div>'; }
+    div.innerHTML=html; return div;
+  }
+  function injectAll(){
+    if(!window.state||!state.items) return;
+    for(const item of state.items){
+      const r=document.querySelector('[data-result-id="'+item.id+'"]');
+      if(!r||r.querySelector('.arbs-swap-panel')) continue;
+      r.appendChild(buildPanel(item));
+    }
+  }
+  document.addEventListener('change',function(e){
+    const sel=e.target;
+    if(!sel.classList||!sel.classList.contains('arbs-swap-sel')) return;
+    const item=(window.state&&state.items)?state.items.find(x=>x.id===sel.dataset.itemId):null;
+    if(!item) return;
+    const v=sel.value===''?null:parseInt(sel.value,10);
+    if(sel.dataset.kind==='base'){
+      if(v==null) delete item.baseSwap; else item.baseSwap=v;
+    }else{
+      if(!item.partSwaps) item.partSwaps={};
+      const from=parseInt(sel.dataset.from,10);
+      if(v==null) delete item.partSwaps[from]; else item.partSwaps[from]=v;
+    }
+    sel.classList.toggle('changed', v!=null);
+    if(window.updateModifiedState) updateModifiedState(item);
+  });
+  if(document.readyState!=='loading'){ try{ injectAll(); }catch(e){} }
+  console.log('[ARBS swap-addon] loaded. groups:',Object.keys(ARBS_SWAP_DATA.SWAP_GROUPS),'bases:',Object.keys(ARBS_SWAP_DATA.BASE_GROUPS));
+})();
+</script>
