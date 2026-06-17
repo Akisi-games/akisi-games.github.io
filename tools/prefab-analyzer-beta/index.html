@@ -2635,3 +2635,121 @@ render();
   console.log('[ARBS swap-addon] loaded. groups:',Object.keys(ARBS_SWAP_DATA.SWAP_GROUPS),'bases:',Object.keys(ARBS_SWAP_DATA.BASE_GROUPS));
 })();
 </script>
+
+
+<!-- ARBS ロボ完全化 + 一括色変更アドオン v2 (2026-06-17) -->
+<script>
+(function(){
+  // ロボの欠けていた19形状(各7色=133ID)を実機の連番規則(黒IDに色ごと+36)で生成
+  var MISS_BLACK=[4399,4400,4401,4402,4403,4368,4369,4370,4371,4372,4373,4374,4375,4376,4377,4378,4379,4380,4381];
+  var COLS=["黒","青","緑","橙","ピンク","赤","灰"];
+  var ROBO_GROUPS={};
+  for(var i=0;i<MISS_BLACK.length;i++){
+    var b=MISS_BLACK[i], opts={}; for(var c=0;c<COLS.length;c++) opts[COLS[c]]=b+36*c;
+    var seq=18+i, key="ロボティック_形状"+seq;
+    ROBO_GROUPS[key]={displayName:"ロボパーツ 形状"+seq,category:"ロボティック",type:"color",options:opts};
+  }
+  function applyRobo(){
+    try{
+      if(typeof VARIANT_GROUPS==='undefined') return false;
+      for(var k in ROBO_GROUPS){
+        if(VARIANT_GROUPS[k]) continue;
+        VARIANT_GROUPS[k]=ROBO_GROUPS[k];
+        var o=ROBO_GROUPS[k].options;
+        for(var lb in o){ var id=o[lb];
+          if(typeof PREFAB_ID_TO_GROUP!=='undefined') PREFAB_ID_TO_GROUP[id]={groupKey:k,label:lb};
+          if(typeof PREFAB_MAP!=='undefined'&&PREFAB_MAP&&!PREFAB_MAP[id]) PREFAB_MAP[id]={n:ROBO_GROUPS[k].displayName+' '+lb,c:'ロボティック'};
+        }
+      }
+      return true;
+    }catch(e){ return false; }
+  }
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',applyRobo); } else { applyRobo(); }
+  setTimeout(applyRobo,300); setTimeout(applyRobo,1200); setTimeout(applyRobo,2600);
+
+  // ---- 一括色変更パネル ----
+  var BULK={from:'',to:''}, _flashMsg='';
+  function S(){ return (window.state||(typeof state!=='undefined'?state:null)); }
+  function P2G(){ return (window.PREFAB_ID_TO_GROUP||(typeof PREFAB_ID_TO_GROUP!=='undefined'?PREFAB_ID_TO_GROUP:null)); }
+  function flash(m){ _flashMsg=m; var el=document.getElementById('arbsBulkMsg'); if(el) el.textContent=m; }
+  function collectColors(){
+    var st=S(),set={}; if(!st||!st.items) return [];
+    for(var i=0;i<st.items.length;i++){ var cbs=st.items[i].summary&&st.items[i].summary.colorBlocks; if(!cbs) continue;
+      for(var gk in cbs){ var cb=cbs[gk]; if(cb.type!=='color') continue; for(var lb in cb.availableColors) set[lb]=true; } }
+    return Object.keys(set);
+  }
+  function applyBulk(){
+    var st=S(); if(!st||!st.items) return;
+    var from=BULK.from,to=BULK.to;
+    if(!from||!to||from===to){ flash('元の色と新しい色を選んでください'); return; }
+    var p2g=P2G(),changed=0;
+    for(var i=0;i<st.items.length;i++){ var it=st.items[i]; var cbs=it.summary&&it.summary.colorBlocks; if(!cbs) continue;
+      for(var gk in cbs){ var cb=cbs[gk]; if(cb.type!=='color') continue;
+        if(cb.availableColors[from]===undefined||cb.availableColors[to]===undefined) continue;
+        var has=false; for(var j=0;j<cb.instances.length;j++){ var gi=p2g&&p2g[cb.instances[j].idx]; if(gi&&gi.label===from){ has=true; break; } }
+        if(!has) continue;
+        if(!it.colorChanges) it.colorChanges={}; if(!it.colorChanges[gk]) it.colorChanges[gk]={};
+        it.colorChanges[gk][from]=to; changed++;
+      }
+      try{ if(window.updateModifiedState) updateModifiedState(it); else if(typeof updateModifiedState!=='undefined') updateModifiedState(it); }catch(e){}
+    }
+    try{ if(window.render) render(); else if(typeof render!=='undefined') render(); }catch(e){}
+    flash(changed>0?(from+' → '+to+' を '+changed+' グループに適用しました'):('「'+from+'」を使うブロックが見つかりませんでした'));
+  }
+  function resetBulk(){
+    var st=S(); if(!st||!st.items) return;
+    for(var i=0;i<st.items.length;i++){ var it=st.items[i]; if(it.colorChanges){ delete it.colorChanges; try{ if(window.updateModifiedState) updateModifiedState(it); }catch(e){} } }
+    try{ if(window.render) render(); }catch(e){}
+    flash('色変更をすべてリセットしました');
+  }
+  function buildPanel(){
+    var colors=collectColors(), div=document.createElement('div'); div.id='arbsBulkColor'; div.className='arbs-bulk-panel';
+    function opts(sel){ var h='<option value="">—</option>'; for(var i=0;i<colors.length;i++){ var c=colors[i]; h+='<option value="'+c+'"'+(sel===c?' selected':'')+'>'+c+'</option>'; } return h; }
+    div.innerHTML='<div class="arbs-bulk-head">🎨 一括色変更 <span class="arbs-bulk-hint">— 読み込んだ全ファイルの同じ色をまとめて変換します</span></div>'+
+      '<div class="arbs-bulk-row"><span class="arbs-bulk-cur">元の色</span>'+
+      '<select id="arbsBulkFrom" class="arbs-bulk-sel">'+opts(BULK.from)+'</select>'+
+      '<span class="arbs-bulk-arrow">→</span><span class="arbs-bulk-cur">新しい色</span>'+
+      '<select id="arbsBulkTo" class="arbs-bulk-sel">'+opts(BULK.to)+'</select>'+
+      '<button type="button" id="arbsBulkApply" class="arbs-bulk-btn">適用</button>'+
+      '<button type="button" id="arbsBulkReset" class="arbs-bulk-btn reset">リセット</button>'+
+      '<span id="arbsBulkMsg" class="arbs-bulk-msg">'+(_flashMsg||'')+'</span></div>'+
+      '<div class="arbs-bulk-note">※ 元の色と新しい色の両方を持つ形状だけが変換されます（例: 青→赤 は青と赤の両方がある形状に適用）。個別調整は各ファイルの「バリエーション変換可能ブロック」で行えます。</div>';
+    return div;
+  }
+  function inject(){
+    var st=S(); if(!st||!st.items||st.items.length===0) return;
+    var res=document.getElementById('results'); if(!res) return;
+    if(document.getElementById('arbsBulkColor')) return;
+    res.parentNode.insertBefore(buildPanel(),res);
+  }
+  function wrapRender(){
+    try{ var r=window.render||(typeof render!=='undefined'?render:null); if(!r||r.__arbsBulkWrapped) return;
+      var w=function(){ var ret=r.apply(this,arguments); try{ inject(); }catch(e){} return ret; }; w.__arbsBulkWrapped=true;
+      window.render=w; try{ render=w; }catch(e){}
+    }catch(e){}
+  }
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',wrapRender); } else { wrapRender(); }
+  setTimeout(wrapRender,400); setTimeout(wrapRender,1500); setTimeout(wrapRender,3000);
+  document.addEventListener('change',function(e){ if(e.target&&e.target.id==='arbsBulkFrom') BULK.from=e.target.value; else if(e.target&&e.target.id==='arbsBulkTo') BULK.to=e.target.value; });
+  document.addEventListener('click',function(e){ if(!e.target) return;
+    if(e.target.id==='arbsBulkApply'){ var f=document.getElementById('arbsBulkFrom'),t=document.getElementById('arbsBulkTo'); if(f)BULK.from=f.value; if(t)BULK.to=t.value; applyBulk(); }
+    else if(e.target.id==='arbsBulkReset') resetBulk();
+  });
+})();
+</script>
+<style>
+.arbs-bulk-panel{background:#11202b;border:1px solid #1d3a4a;border-radius:10px;padding:12px 14px;margin:0 0 14px 0;}
+.arbs-bulk-head{font-weight:700;color:#7fe9ff;margin-bottom:8px;}
+.arbs-bulk-hint{font-weight:400;color:#6f8a99;font-size:12px;}
+.arbs-bulk-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.arbs-bulk-cur{color:#9fc2d3;font-size:13px;}
+.arbs-bulk-arrow{color:#7fe9ff;font-weight:700;}
+.arbs-bulk-sel{background:#0c1922;color:#e6f3fa;border:1px solid #24516b;border-radius:6px;padding:4px 8px;min-width:90px;}
+.arbs-bulk-sel:hover{border-color:#7fe9ff;}
+.arbs-bulk-btn{background:#155a7a;color:#fff;border:0;border-radius:6px;padding:5px 14px;cursor:pointer;font-weight:700;}
+.arbs-bulk-btn:hover{background:#1c7aa3;}
+.arbs-bulk-btn.reset{background:#3a2a2a;}
+.arbs-bulk-btn.reset:hover{background:#5a3a3a;}
+.arbs-bulk-msg{color:#7fe9ff;font-size:12px;margin-left:6px;}
+.arbs-bulk-note{color:#6f8a99;font-size:11.5px;margin-top:8px;line-height:1.5;}
+</style>
