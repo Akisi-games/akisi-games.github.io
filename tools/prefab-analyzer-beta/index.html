@@ -2637,12 +2637,12 @@ render();
 </script>
 
 
-<!-- ARBS ロボ完全化 + 一括色変更アドオン v2 (2026-06-17) -->
+<!-- ARBS ロボ完全化 + 一括色変更アドオン v3 (2026-06-17) -->
 <script>
 (function(){
-  // ロボの欠けていた19形状(各7色=133ID)を実機の連番規則(黒IDに色ごと+36)で生成
+  // ロボの欠けていた19形状(各7色=133ID)を実機の連番規則で生成
   var MISS_BLACK=[4399,4400,4401,4402,4403,4368,4369,4370,4371,4372,4373,4374,4375,4376,4377,4378,4379,4380,4381];
-  var COLS=["黒","青","緑","橙","ピンク","赤","灰"];
+  var COLS=["黒","緑","青","橙","ピンク","赤","灰"];   // 実機の色順(緑=黒+36,青=黒+72)
   var ROBO_GROUPS={};
   for(var i=0;i<MISS_BLACK.length;i++){
     var b=MISS_BLACK[i], opts={}; for(var c=0;c<COLS.length;c++) opts[COLS[c]]=b+36*c;
@@ -2653,12 +2653,17 @@ render();
     try{
       if(typeof VARIANT_GROUPS==='undefined') return false;
       for(var k in ROBO_GROUPS){
-        if(VARIANT_GROUPS[k]) continue;
-        VARIANT_GROUPS[k]=ROBO_GROUPS[k];
-        var o=ROBO_GROUPS[k].options;
+        if(!VARIANT_GROUPS[k]) VARIANT_GROUPS[k]=ROBO_GROUPS[k];
+      }
+      // 全ロボグループの 青/緑 を正規化(実機: 緑=黒+36, 青=黒+72)。冪等。
+      for(var gk in VARIANT_GROUPS){
+        if(gk.indexOf('ロボティック')!==0) continue;
+        var g=VARIANT_GROUPS[gk], o=g.options; if(!o||o['黒']===undefined) continue;
+        var B=o['黒'];
+        o['緑']=B+36; o['青']=B+72;
         for(var lb in o){ var id=o[lb];
-          if(typeof PREFAB_ID_TO_GROUP!=='undefined') PREFAB_ID_TO_GROUP[id]={groupKey:k,label:lb};
-          if(typeof PREFAB_MAP!=='undefined'&&PREFAB_MAP&&!PREFAB_MAP[id]) PREFAB_MAP[id]={n:ROBO_GROUPS[k].displayName+' '+lb,c:'ロボティック'};
+          if(typeof PREFAB_ID_TO_GROUP!=='undefined') PREFAB_ID_TO_GROUP[id]={groupKey:gk,label:lb};
+          if(typeof PREFAB_MAP!=='undefined'&&PREFAB_MAP) PREFAB_MAP[id]={n:g.displayName+' '+lb,c:'ロボティック'};
         }
       }
       return true;
@@ -2669,13 +2674,14 @@ render();
 
   // ---- 一括色変更パネル ----
   var BULK={from:'',to:''}, _flashMsg='';
+  var EXCLUDE=/ｻﾝｸﾞﾗｽ|サングラス/;   // 一括色変更の候補から除外するラベル
   function S(){ return (window.state||(typeof state!=='undefined'?state:null)); }
   function P2G(){ return (window.PREFAB_ID_TO_GROUP||(typeof PREFAB_ID_TO_GROUP!=='undefined'?PREFAB_ID_TO_GROUP:null)); }
   function flash(m){ _flashMsg=m; var el=document.getElementById('arbsBulkMsg'); if(el) el.textContent=m; }
   function collectColors(){
     var st=S(),set={}; if(!st||!st.items) return [];
     for(var i=0;i<st.items.length;i++){ var cbs=st.items[i].summary&&st.items[i].summary.colorBlocks; if(!cbs) continue;
-      for(var gk in cbs){ var cb=cbs[gk]; if(cb.type!=='color') continue; for(var lb in cb.availableColors) set[lb]=true; } }
+      for(var gk in cbs){ var cb=cbs[gk]; if(cb.type!=='color') continue; for(var lb in cb.availableColors){ if(EXCLUDE.test(lb)) continue; set[lb]=true; } } }
     return Object.keys(set);
   }
   function applyBulk(){
