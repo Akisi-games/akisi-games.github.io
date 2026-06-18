@@ -2759,3 +2759,76 @@ render();
 .arbs-bulk-msg{color:#7fe9ff;font-size:12px;margin-left:6px;}
 .arbs-bulk-note{color:#6f8a99;font-size:11.5px;margin-top:8px;line-height:1.5;}
 </style>
+
+
+<!-- ARBS ベース変更先=全カタログ化(兵士追加)アドオン v1 (2026-06-18) -->
+<script>
+(function(){
+  "use strict";
+  // 全ベースカタログ（既存ベース + 兵士ロスター 現代人/古代人）
+  var BASE_CAT={
+    "人型":{"ヒルジャイアント":88,"ゴリラ":89,"スケルトン":90,"男性1":91,"男性2":92,"女性":93,"カプリコーン":99},
+    "現代哺乳類":{"バッファロー":103,"サイ":104,"キリン":105,"ゾウ":106},
+    "草食恐竜":{"パラサウロロフス":95,"アンキロ":101,"トリケラ":100,"スケルトントリケラ":116,"スケルトンブラキオ":117,"ブラキオ":102},
+    "肉食恐竜":{"ディロフォ":98,"アロ":96,"スピノ":97,"ティラノ":94,"スケルトンティラノ":118},
+    "飛竜/その他":{"ワイバーン":113,"プルスサウルス":114},
+    "ロボベース":{"箱ダイナミック":87,"箱スタティック":112,"球面":121,"ホイール":122,"4輪":156,"二足":123,"四足黄":124,"四足青":125,"四足赤":126,"四足緑":127,"B.O.S.S":158,"S.P.I.D.E.R":175},
+    "現代人(兵士)":{"FPSアバター":71,"臆病者コール":30,"大胆ビリー":31,"怒りジョー":27,"スローモー":28,"クロスボウアネコ":32,"自殺スー":26,"コマンドーボー":35,"ロッキー":34,"クリプト・プロ":152},
+    "古代人(兵士)":{"クリクサスザガウル":63,"アーチー・ザ・アーチャー":29,"ルーマナス":33,"チュートニックナイト":62,"スパルタ戦士":70,"ヒュッサー":69,"アキレウス":154,"アキレウス：エロス":195}
+  };
+  function esc(s){ try{ if(window.escapeHTML) return window.escapeHTML(s); }catch(e){} return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function nameOf(idx){ for(var g in BASE_CAT){ for(var nm in BASE_CAT[g]){ if(BASE_CAT[g][nm]===idx) return nm; } } return null; }
+  function buildBaseOptions(curIdx, selIdx){
+    var h='<option value="">— 変更なし —</option>';
+    for(var g in BASE_CAT){
+      h+='<optgroup label="'+esc(g)+'">';
+      var o=BASE_CAT[g];
+      for(var nm in o){ var id=o[nm];
+        var sel=(selIdx!=null&&selIdx===id)?' selected':'';
+        var cur=(id===curIdx)?' (現在)':'';
+        h+='<option value="'+id+'"'+sel+'>'+esc(nm)+cur+'</option>';
+      }
+      h+='</optgroup>';
+    }
+    return h;
+  }
+  function S(){ return window.state||(typeof state!=='undefined'?state:null); }
+  function rewriteBases(){
+    var st=S(); if(!st||!st.items) return;
+    var panels=document.querySelectorAll('.arbs-swap-panel');
+    for(var pi=0;pi<panels.length;pi++){
+      var panel=panels[pi];
+      var r=panel.closest('[data-result-id]'); if(!r) continue;
+      var id=r.getAttribute('data-result-id');
+      var item=null; for(var k=0;k<st.items.length;k++){ if(st.items[k].id===id){ item=st.items[k]; break; } }
+      if(!item||!item.summary) continue;
+      var baseIdx=item.summary.baseIdx;
+      var sel=panel.querySelector('select[data-kind="base"]');
+      if(sel){
+        if(sel.getAttribute('data-arbsall')==='1') continue;   // 同一DOMでの再処理防止
+        sel.innerHTML=buildBaseOptions(baseIdx,item.baseSwap);
+        sel.setAttribute('data-arbsall','1');
+      } else if(item.summary.baseIdxOffset!=null){
+        // partswap がベース欄を出していない（現在ベースが未知グループ）→ 自前で挿入
+        var row=document.createElement('div'); row.className='arbs-swap-row'; row.setAttribute('data-arbsbase','1');
+        var curName=(item.summary.baseInfo&&item.summary.baseInfo.n)||nameOf(baseIdx)||('ID'+baseIdx);
+        row.innerHTML='<span class="arbs-swap-cur"><span class="arbs-swap-cat base">ベース</span>'+esc(curName)+'</span>'+
+          '<span class="arbs-swap-arrow">→</span>'+
+          '<select class="arbs-swap-sel" data-item-id="'+id+'" data-kind="base" data-arbsall="1">'+buildBaseOptions(baseIdx,item.baseSwap)+'</select>';
+        var firstRow=panel.querySelector('.arbs-swap-row');
+        if(firstRow) panel.insertBefore(row,firstRow); else panel.appendChild(row);
+      }
+    }
+  }
+  function wrap(){
+    var r=window.render||(typeof render!=='undefined'?render:null);
+    if(!r||r.__arbsBaseWrapped) return;
+    var w=function(){ var ret=r.apply(this,arguments); try{ rewriteBases(); }catch(e){} return ret; };
+    w.__arbsBaseWrapped=true; window.render=w; try{ render=w; }catch(e){}
+  }
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',wrap); } else { wrap(); }
+  setTimeout(wrap,500); setTimeout(wrap,1600); setTimeout(wrap,3200);
+  // 保険：パネルが後から差し込まれた場合に備えて定期的にも適用
+  setInterval(function(){ try{ rewriteBases(); }catch(e){} }, 1500);
+})();
+</script>
