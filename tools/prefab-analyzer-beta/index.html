@@ -2903,13 +2903,14 @@ CSS.textContent = '.tree-box{margin:8px 0;padding:10px;border:2px solid #8bc34a;
  + '.tree-toggle{margin:6px 0;padding:5px 12px;background:#33691e;color:#fff;border:none;border-radius:6px;cursor:pointer}';
 document.head.appendChild(CSS);
 
-function boneLabel(K, p){ return 'ボーン' + p + '/' + K; }
+function boneLabel(baseDisp, K, p){ return '🦴 ' + baseDisp + ' の骨' + p + '（土台の骨 ' + p + '/' + K + '）'; }
 
 function buildTreeHTML(item){
   const sim = simulate(item);
   if(!sim) return '<div class="tree-warn">解析データなし</div>';
   const s = item.summary;
   const pend = item.__tree || new Map();
+  const baseDisp = (s.baseInfo && s.baseInfo.n) ? s.baseInfo.n : ('土台' + s.baseIdx);
   let html = '<div><b>土台:</b> ' + (s.baseInfo?.n || 'base ' + s.baseIdx) + '（unitPrefabIndex=' + s.baseIdx
     + '、ボーン数K=' + sim.K + (sim.kLearned ? '' : ' <span class="tree-warn">※未知ベース・推定値</span>') + '）</div>';
   if(sim.warnings.length) html += '<div class="tree-warn">⚠ ' + sim.warnings.join('<br>⚠ ') + '</div>';
@@ -2917,7 +2918,7 @@ function buildTreeHTML(item){
   // 親の選択肢リストを作る関数（block i より前のキャリア＋全ボーン）
   const parentOptions = (i) => {
     let opts = [];
-    for(let p = 1; p <= sim.K; p++) opts.push({ v: p, label: 'ボーン' + p });
+    for(let p = 1; p <= sim.K; p++) opts.push({ v: p, label: '土台「' + baseDisp + '」骨' + p });
     for(let j = 0; j < i; j++){
       const n2 = sim.nodes[j];
       if(n2.ownCount === 0) continue;
@@ -2955,12 +2956,12 @@ function buildTreeHTML(item){
     byBone.get(n.parentBone).push(n);
   }
   for(const bone of Array.from(byBone.keys()).sort((a,b)=>a-b)){
-    html += '<div class="tree-bone">🦴 ' + boneLabel(sim.K, bone) + '（' + byBone.get(bone).length + '個）</div>';
+    html += '<div class="tree-bone">' + boneLabel(baseDisp, sim.K, bone) + '（' + byBone.get(bone).length + '個）</div>';
     html += '<ul>' + byBone.get(bone).map(partRow).join('') + '</ul>';
   }
   const unresolved = sim.nodes.filter(n => !n.parentNode && n.parentBone === 0);
   if(unresolved.length){
-    html += '<div class="tree-bone tree-warn">❓ 親不明</div><ul>' + unresolved.map(partRow).join('') + '</ul>';
+    html += '<div class="tree-bone tree-warn">❓ 親の解決不可（テーブル未確定の可能性）</div><ul>' + unresolved.map(partRow).join('') + '</ul>';
   }
   const editCount = pend.size;
   html += '<button class="tree-dl" data-treedl="' + item.id + '"' + (editCount ? '' : ' disabled') + '>🌳ツリー編集版をダウンロード（' + editCount + '件の変更）</button>'
@@ -3045,7 +3046,7 @@ if(typeof render === 'function'){
   render = function(){ _render.apply(this, arguments); try{ injectButtons(); }catch(e){ console.error(e); } };
 }
 setInterval(function(){ try{ injectButtons(); }catch(e){} }, 1500);
-console.log('[TreeAddon] 接続ツリー＋親付け替えアドオン v1 loaded (bases:' + Object.keys(BASE_K).length + ', carriers:' + Object.keys(CARRIER_RB).length + ')');
+console.log('[TreeAddon] 接続ツリー＋親付け替えアドオン v1.1 loaded (bases:' + Object.keys(BASE_K).length + ', carriers:' + Object.keys(CARRIER_RB).length + ')');
 })();
 </script>
 
