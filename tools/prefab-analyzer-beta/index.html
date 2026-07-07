@@ -2832,3 +2832,220 @@ render();
   setInterval(function(){ try{ rewriteBases(); }catch(e){} }, 1500);
 })();
 </script>
+
+<!-- ============================================================
+  ARBS Prefab Analyzer 拡張: 🌳接続ツリー＋親付け替え アドオン v1
+  （</body>直前に貼る。index-NEW系で動作。要: state/lookup/applyEdits）
+  データ: BASE_K=ベース別ボーン数 / CARRIER_RB=キャリアID別登録RB数
+  （890体の実ファイルからの学習＋DLL静的解析のクロス検証済み 2026-07-04）
+============================================================ -->
+<script>
+(function(){
+'use strict';
+const BASE_K = {"156":23,"35":13,"87":1,"32":13,"73":32,"153":15,"148":11,"149":14,"100":26,"107":16,"55":23,"8":25,"56":22,"28":11,"71":13,"61":13,"112":1,"90":22,"154":16,"93":13,"121":12,"99":9,"102":26,"97":11,"34":15,"62":2,"163":18,"120":19,"1":22,"118":20,"3":17,"59":16,"83":25,"49":23,"88":1,"162":15,"115":8,"185":14,"150":16,"48":21,"4":15,"122":4,"125":17,"155":30,"21":21,"18":19,"20":15,"24":23,"109":41,"129":27,"140":26,"36":26,"135":27,"124":14,"142":26,"92":7,"91":7,"89":8,"37":29,"127":16,"175":14,"151":43,"128":14,"29":13,"152":11,"123":28,"31":12,"158":25,"110":10,"108":26,"111":17,"27":13,"126":15,"81":19,"94":24,"113":29,"116":20,"60":17,"76":19,"45":12,"47":20,"68":27,"114":19,"117":12};
+const CARRIER_RB = {"4256":5,"4353":5,"4360":5,"4361":5,"4275":5,"4276":5,"4277":5,"4278":5,"4253":5,"4254":5,"4255":5,"4291":6,"4292":6,"4293":6,"4294":6,"4295":6,"4296":6,"4297":6,"4298":6,"4299":6,"4300":6,"4301":6,"4232":3,"4233":3,"4234":3,"4235":3,"4236":3,"4237":3,"4062":3,"4063":3,"4064":3,"4065":3,"4066":3,"4067":3,"4068":3,"4069":3,"4070":3,"4071":3,"4072":3,"4073":3,"4074":3,"4075":3,"4076":3,"4077":3,"4078":3,"4079":3,"4080":3,"4081":3,"4082":3,"4083":3,"4084":3,"4085":3,"4036":3,"4037":3,"4230":3,"4038":3,"4039":3,"4231":3,"4058":3,"4059":3,"4060":3,"4061":3,"4257":3,"4258":3,"4259":3,"4260":3,"4261":3,"4262":3,"4263":3,"4264":3,"4265":3,"4266":3,"4004":3,"4024":3,"4025":3,"4026":3,"4027":3,"4192":2,"4089":1,"4288":4,"4289":4,"4290":4,"4286":4,"4287":4,"4320":1,"4321":1,"4322":1,"4323":1,"4324":1,"4325":1,"4326":1,"4327":1,"4328":1,"4329":1,"4330":1,"4331":1,"4228":1,"4195":3,"4193":1,"4281":5,"4244":5,"4227":1,"4252":1,"4194":2,"4223":1,"4225":1,"4241":1,"4229":1,"4240":1,"4642":1,"4242":1,"4643":1,"4243":3,"4267":2,"4250":1,"4352":2,"4359":1,"4222":7};
+const rbOf = id => CARRIER_RB[String(id)] || 0;
+
+// ---------- 採番シミュレーション ----------
+function simulate(item){
+  const s = item.summary; if(!s) return null;
+  const blocks = s.allWeaponBlocks || [];
+  // 保留中のツリー編集を反映した仮想parent
+  const pend = item.__tree || new Map();
+  const parentOf = b => pend.has(b.blockStart) && pend.get(b.blockStart).newParent != null
+      ? pend.get(b.blockStart).newParent : b.parent;
+  let K = BASE_K[String(s.baseIdx)];
+  let kLearned = true;
+  if(K == null){ // 未知ベース: このファイル単体から必要最小Kを推定
+    kLearned = false; let carrier = 0; K = 1;
+    for(const b of blocks){ K = Math.max(K, parentOf(b) - carrier); carrier += rbOf(b.idx); }
+  }
+  let alloc = K;
+  const nodes = [];
+  const warnings = [];
+  for(let i = 0; i < blocks.length; i++){
+    const b = blocks[i];
+    const cnt = rbOf(b.idx);
+    const node = { i, b, ownStart: cnt > 0 ? alloc + 1 : 0, ownCount: cnt, children: [], parentNode: null, parentBone: 0 };
+    const p = parentOf(b);
+    if(p >= 1 && p <= K){ node.parentBone = p; }
+    else {
+      let owner = null;
+      for(let j = i - 1; j >= 0; j--){
+        const n2 = nodes[j];
+        if(n2.ownCount > 0 && p >= n2.ownStart && p < n2.ownStart + n2.ownCount){ owner = n2; break; }
+      }
+      if(owner){ node.parentNode = owner; owner.children.push(node); }
+      else warnings.push('#' + (i+1) + ' (ID' + b.idx + ') の親番号 ' + p + ' を解決できません（テーブル未確定の可能性）');
+    }
+    nodes.push(node);
+    alloc += cnt;
+  }
+  return { K, kLearned, nodes, warnings };
+}
+function nameOf(id){
+  try{ const inf = lookup(id); if(inf && inf.n) return inf.n; }catch(e){}
+  return 'ID' + id;
+}
+
+// ---------- UI ----------
+const CSS = document.createElement('style');
+CSS.textContent = '.tree-box{margin:8px 0;padding:10px;border:2px solid #8bc34a;border-radius:8px;background:#f7fff0;font-size:13px}'
+ + '.tree-box ul{list-style:none;margin:2px 0 2px 18px;padding:0;border-left:1px dashed #aaa}'
+ + '.tree-box li{margin:2px 0;padding-left:8px}'
+ + '.tree-bone{font-weight:bold;color:#33691e;margin-top:6px}'
+ + '.tree-part.pending{background:#fff3cd;border-radius:4px}'
+ + '.tree-part select,.tree-part input{font-size:12px;margin-left:4px}'
+ + '.tree-part input[type=number]{width:64px}'
+ + '.tree-warn{color:#c62828;font-size:12px}'
+ + '.tree-dl{margin-top:8px;padding:6px 14px;background:#8bc34a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold}'
+ + '.tree-dl:disabled{background:#ccc;cursor:default}'
+ + '.tree-toggle{margin:6px 0;padding:5px 12px;background:#33691e;color:#fff;border:none;border-radius:6px;cursor:pointer}';
+document.head.appendChild(CSS);
+
+function boneLabel(K, p){ return 'ボーン' + p + '/' + K; }
+
+function buildTreeHTML(item){
+  const sim = simulate(item);
+  if(!sim) return '<div class="tree-warn">解析データなし</div>';
+  const s = item.summary;
+  const pend = item.__tree || new Map();
+  let html = '<div><b>土台:</b> ' + (s.baseInfo?.n || 'base ' + s.baseIdx) + '（unitPrefabIndex=' + s.baseIdx
+    + '、ボーン数K=' + sim.K + (sim.kLearned ? '' : ' <span class="tree-warn">※未知ベース・推定値</span>') + '）</div>';
+  if(sim.warnings.length) html += '<div class="tree-warn">⚠ ' + sim.warnings.join('<br>⚠ ') + '</div>';
+
+  // 親の選択肢リストを作る関数（block i より前のキャリア＋全ボーン）
+  const parentOptions = (i) => {
+    let opts = [];
+    for(let p = 1; p <= sim.K; p++) opts.push({ v: p, label: 'ボーン' + p });
+    for(let j = 0; j < i; j++){
+      const n2 = sim.nodes[j];
+      if(n2.ownCount === 0) continue;
+      for(let k = 0; k < n2.ownCount; k++)
+        opts.push({ v: n2.ownStart + k, label: '#' + (j+1) + ' ' + nameOf(n2.b.idx) + (n2.ownCount > 1 ? ' [RB' + (k+1) + ']' : '') });
+    }
+    return opts;
+  };
+
+  const partRow = (node) => {
+    const b = node.b; const i = node.i;
+    const pendE = pend.get(b.blockStart);
+    const curParent = pendE && pendE.newParent != null ? pendE.newParent : b.parent;
+    const curScale = pendE && pendE.newScaleRaw != null ? pendE.newScaleRaw / 100000 : b.scale;
+    let selHtml = '<select data-tree-item="' + item.id + '" data-tree-block="' + b.blockStart + '">';
+    for(const o of parentOptions(i))
+      selHtml += '<option value="' + o.v + '"' + (o.v === curParent ? ' selected' : '') + '>' + o.label + '</option>';
+    selHtml += '</select>';
+    return '<li class="tree-part' + (pendE ? ' pending' : '') + '" data-block="' + b.blockStart + '">'
+      + '<b>#' + (i+1) + '</b> ' + nameOf(b.idx) + ' <span style="color:#888">(ID' + b.idx + ')</span>'
+      + (node.ownCount > 0 ? ' <span style="color:#33691e">◆キャリア(RB' + node.ownCount + ')</span>' : '')
+      + ' | 親:' + selHtml
+      + ' 倍率:<input type="number" step="0.1" min="0.01" value="' + (Math.round(curScale*10000)/10000) + '" data-scale-item="' + item.id + '" data-scale-block="' + b.blockStart + '">'
+      + ' <button data-apply-item="' + item.id + '" data-apply-block="' + b.blockStart + '">適用</button>'
+      + (node.children.length ? '<ul>' + node.children.map(partRow).join('') + '</ul>' : '')
+      + '</li>';
+  };
+
+  // ボーン別にトップレベルノードを表示
+  const byBone = new Map();
+  for(const n of sim.nodes){
+    if(n.parentNode) continue; // 子はネスト表示
+    if(n.parentBone === 0) continue; // 未解決
+    if(!byBone.has(n.parentBone)) byBone.set(n.parentBone, []);
+    byBone.get(n.parentBone).push(n);
+  }
+  for(const bone of Array.from(byBone.keys()).sort((a,b)=>a-b)){
+    html += '<div class="tree-bone">🦴 ' + boneLabel(sim.K, bone) + '（' + byBone.get(bone).length + '個）</div>';
+    html += '<ul>' + byBone.get(bone).map(partRow).join('') + '</ul>';
+  }
+  const unresolved = sim.nodes.filter(n => !n.parentNode && n.parentBone === 0);
+  if(unresolved.length){
+    html += '<div class="tree-bone tree-warn">❓ 親不明</div><ul>' + unresolved.map(partRow).join('') + '</ul>';
+  }
+  const editCount = pend.size;
+  html += '<button class="tree-dl" data-treedl="' + item.id + '"' + (editCount ? '' : ' disabled') + '>🌳ツリー編集版をダウンロード（' + editCount + '件の変更）</button>'
+    + '<div style="font-size:11px;color:#666">※このボタンはツリー編集（親付け替え・倍率）のみ反映した別ファイルを保存します。名前/HP/色変更等は従来のダウンロードボタンをご利用ください。</div>';
+  return html;
+}
+
+function refreshTree(item){
+  const box = document.getElementById('treebox-' + item.id);
+  if(box && box.style.display !== 'none') box.innerHTML = buildTreeHTML(item);
+}
+
+// クリック/変更ハンドラ（イベント委任）
+document.addEventListener('click', function(ev){
+  const t = ev.target;
+  if(t.dataset && t.dataset.treetoggle){
+    const item = state.items.find(x => String(x.id) === t.dataset.treetoggle);
+    const box = document.getElementById('treebox-' + t.dataset.treetoggle);
+    if(item && box){
+      if(box.style.display === 'none'){ box.style.display = 'block'; box.innerHTML = buildTreeHTML(item); }
+      else box.style.display = 'none';
+    }
+  }
+  if(t.dataset && t.dataset.applyItem){
+    const item = state.items.find(x => String(x.id) === t.dataset.applyItem);
+    if(!item) return;
+    const bs = parseInt(t.dataset.applyBlock);
+    const sel = document.querySelector('select[data-tree-item="' + t.dataset.applyItem + '"][data-tree-block="' + bs + '"]');
+    const inp = document.querySelector('input[data-scale-item="' + t.dataset.applyItem + '"][data-scale-block="' + bs + '"]');
+    const block = item.summary.allWeaponBlocks.find(b => b.blockStart === bs);
+    if(!block || !sel) return;
+    if(!item.__tree) item.__tree = new Map();
+    const e = item.__tree.get(bs) || {};
+    const newParent = parseInt(sel.value);
+    const newScale = parseFloat(inp ? inp.value : block.scale);
+    if(newParent !== block.parent) e.newParent = newParent;
+    if(Math.abs(newScale - block.scale) > 1e-6) e.newScaleRaw = Math.round(newScale * 100000);
+    if(e.newParent == null && e.newScaleRaw == null) item.__tree.delete(bs);
+    else item.__tree.set(bs, e);
+    refreshTree(item);
+  }
+  if(t.dataset && t.dataset.treedl){
+    const item = state.items.find(x => String(x.id) === t.dataset.treedl);
+    if(!item || !item.__tree || item.__tree.size === 0) return;
+    const edits = [];
+    for(const [bs, e] of item.__tree){
+      const block = item.summary.allWeaponBlocks.find(b => b.blockStart === bs);
+      if(!block || !block.keyOffsets) continue;
+      // 実測検証済み: value offset = key offset + 4（id/full両レコード型）
+      if(e.newParent != null && block.keyOffsets[10] != null)
+        edits.push({ offset: block.keyOffsets[10] + 4, newRawValue: e.newParent });
+      if(e.newScaleRaw != null && block.keyOffsets[1] != null)
+        edits.push({ offset: block.keyOffsets[1] + 4, newRawValue: e.newScaleRaw });
+    }
+    const modified = applyEdits(item.originalBytes, edits);
+    const blob = new Blob([modified], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = item.filename.replace(/^WEP_ANIM_PREF_/, 'WEP_ANIM_PREF_TREE_');
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+});
+
+// render() 後にトグルボタンを差し込む
+function injectButtons(){
+  document.querySelectorAll('[data-result-id]').forEach(card => {
+    const id = card.dataset.resultId;
+    if(card.querySelector('[data-treetoggle]')) return;
+    const item = state.items.find(x => String(x.id) === String(id));
+    if(!item || !item.summary) return;
+    const btn = document.createElement('button');
+    btn.className = 'tree-toggle'; btn.dataset.treetoggle = id;
+    btn.textContent = '🌳 接続ツリー（' + (item.summary.weaponCount || 0) + 'パーツ）';
+    const box = document.createElement('div');
+    box.className = 'tree-box'; box.id = 'treebox-' + id; box.style.display = 'none';
+    card.appendChild(btn); card.appendChild(box);
+  });
+}
+if(typeof render === 'function'){
+  const _render = render;
+  render = function(){ _render.apply(this, arguments); try{ injectButtons(); }catch(e){ console.error(e); } };
+}
+setInterval(function(){ try{ injectButtons(); }catch(e){} }, 1500);
+console.log('[TreeAddon] 接続ツリー＋親付け替えアドオン v1 loaded (bases:' + Object.keys(BASE_K).length + ', carriers:' + Object.keys(CARRIER_RB).length + ')');
+})();
+</script>
+
